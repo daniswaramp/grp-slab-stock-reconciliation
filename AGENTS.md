@@ -320,7 +320,7 @@ The CSV parser (in `components/Database.tsx`) expects fixed column order:
 ### Session: 2026-03-27 (Initial Setup)
 
 - **GitHub MCP Configured**: Using GitHub's official MCP server (`https://api.githubcopilot.com/mcp/`) with Bearer token authentication
-- **Repository**: `daniswaramp/grp-slab-opname` (public)
+- **Repository**: `daniswaramp/grp-slab-stock-reconciliation` (public)
 - **GitHub PAT**: Available in user's opencode config (do not share)
 - **Supabase**: Uses environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY in .env.local)
 - **Project ID**: mqwpgqvyzrjfsitvrmgh
@@ -353,7 +353,7 @@ The CSV parser (in `components/Database.tsx`) expects fixed column order:
 
 ## 🔗 External Resources
 
-- **GitHub Repo**: https://github.com/daniswaramp/grp-slab-opname
+- **GitHub Repo**: https://github.com/daniswaramp/grp-slab-stock-reconciliation
 - **Supabase Dashboard**: https://supabase.com/dashboard
 - **Project Supabase**: mqwpgqvyzrjfsitvrmgh
 
