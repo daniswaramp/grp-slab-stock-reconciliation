@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { OpnameRecord, UserRole, OpnameBackup } from '../types';
-import { getBackups, saveBackup, loadBackup, fetchAllOpnameRecords, updateOpnameCacheFromPayload } from '../services/dataService';
+import { getBackups, saveBackup, loadBackup, fetchAllOpnameRecords, updateOpnameCacheFromPayload, clearDataset } from '../services/dataService';
 import { Download, Trash2, Filter, FileSpreadsheet, Save, RotateCcw, Upload, ChevronDown, Database, Link, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Clock } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -17,6 +17,9 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
   const [showBackupMenu, setShowBackupMenu] = useState(false);
   const [backups, setBackups] = useState<OpnameBackup[]>([]);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteAllInput, setDeleteAllInput] = useState('');
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const { t } = useI18n();
@@ -61,7 +64,13 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
           } else if (payload.eventType === 'UPDATE') {
             updated = updated.map(r => r.id === payload.new.id ? payload.new as OpnameRecord : r);
           } else if (payload.eventType === 'DELETE') {
-            updated = updated.filter(r => r.id !== payload.old.id);
+            if (payload.old?.id) {
+              updated = updated.filter(r => r.id !== payload.old.id);
+            } else if (payload.old?.user_name) {
+              updated = updated.filter(r => r.user_name?.toLowerCase() !== payload.old.user_name?.toLowerCase());
+            } else {
+              updated = [];
+            }
           }
           return updated.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
         });
@@ -94,6 +103,23 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this record?')) {
       await supabase.from('opname_records').delete().eq('id', id);
+    }
+  };
+
+  const handleDeleteAllConfirm = async () => {
+    if (deleteAllInput.trim().toLowerCase() !== 'yes i want to delete all list') return;
+    setDeletingAll(true);
+    try {
+      await clearDataset();
+      setRecords([]);
+      setShowDeleteAllModal(false);
+      setDeleteAllInput('');
+      alert(t.opnameList.deleteAllSuccess);
+    } catch (err: any) {
+      console.error('Failed to delete all list:', err);
+      alert('Error deleting records: ' + (err.message || 'Unknown error'));
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -366,6 +392,20 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
               </div>
             )}
 
+            {role === UserRole.ADMIN && !isLocked && (
+              <button
+                onClick={() => {
+                  setDeleteAllInput('');
+                  setShowDeleteAllModal(true);
+                }}
+                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3.5 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-all active:scale-95 text-xs shadow-sm"
+                title={t.opnameList.deleteAll}
+              >
+                <Trash2 size={15} />
+                <span>{t.opnameList.deleteAll}</span>
+              </button>
+            )}
+
             <button
             onClick={exportCSV}
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 text-xs"
@@ -599,6 +639,80 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
                  </div>
              </div>
          </div>
+      )}
+
+      {/* Delete All List Modal with Confirmation Phrase */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp border border-red-200">
+            <div className="p-5 border-b border-red-100 flex items-center justify-between bg-red-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-red-950 text-sm md:text-base">{t.opnameList.deleteAllModalTitle}</h3>
+                  <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Irreversible Action</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowDeleteAllModal(false); setDeleteAllInput(''); }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-red-700 leading-relaxed bg-red-50/70 p-3.5 rounded-xl border border-red-100 font-medium">
+                {t.opnameList.deleteAllModalDesc}
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  {t.opnameList.deleteAllPrompt}
+                </label>
+                <div className="p-2.5 bg-gray-100 rounded-lg text-xs font-mono font-bold text-gray-800 select-all mb-2 border border-gray-200">
+                  yes i want to delete all list
+                </div>
+                <input
+                  type="text"
+                  value={deleteAllInput}
+                  onChange={(e) => setDeleteAllInput(e.target.value)}
+                  placeholder="yes i want to delete all list"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:ring-4 focus:ring-red-50 focus:border-red-500 outline-none transition-all text-gray-900 bg-white"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteAllModal(false); setDeleteAllInput(''); }}
+                  disabled={deletingAll}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-50 transition-all"
+                >
+                  {t.opnameSlab.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAllConfirm}
+                  disabled={deleteAllInput.trim().toLowerCase() !== 'yes i want to delete all list' || deletingAll}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                >
+                  {deletingAll ? (
+                    <span>Deleting...</span>
+                  ) : (
+                    <>
+                      <Trash2 size={14} />
+                      <span>{t.opnameList.deleteAllConfirmBtn}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import Setting from './components/Setting';
 import Database from './components/Database';
 import DatabaseSetup from './components/DatabaseSetup';
 import LockBanner from './components/LockBanner';
+import About from './components/About';
 import { Minus, Plus, Lock, Unlock, X, Info, UserPlus, LogIn, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getSystemNotification, getLockStatus, setLockMode } from './services/dataService';
 import { loginUser, registerUser, requestPasswordReset, getMe, logoutUser } from './services/authService';
@@ -296,7 +297,7 @@ const App: React.FC = () => {
     setAuthSuccess(null);
 
     const u = authUsername.trim();
-    const fn = authFullName.trim();
+    const fn = authFullName.trim().toUpperCase();
 
     if (!u || !fn || !authPassword) {
       setAuthError('Username, Full Name, and Password are all required.');
@@ -526,13 +527,13 @@ const App: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Full Name</label>
+                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Full Name (UPPERCASE)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Budi Santoso"
+                  placeholder="e.g. BUDI SANTOSO"
                   value={authFullName}
-                  onChange={e => setAuthFullName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  onChange={e => setAuthFullName(e.target.value.toUpperCase())}
+                  className="w-full uppercase font-medium border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 
@@ -840,6 +841,7 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'Database' && <Database role={role} isLocked={lockStatus.lock_mode} userName={userName} />}
+          {activeTab === 'About' && <About />}
         </div>
       </main>
 

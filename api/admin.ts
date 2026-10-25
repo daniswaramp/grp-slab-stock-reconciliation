@@ -251,41 +251,72 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'Cannot delete the primary administrator account.' });
       }
 
-      // 1. Delete user from app_users
-      const delRows = await (db as any)(
-        'DELETE FROM "app_users" WHERE LOWER(username) = LOWER($1) RETURNING id, username;',
+      // 1. Fetch user first to get full_name
+      const userRows = await (db as any)(
+        'SELECT id, username, full_name FROM "app_users" WHERE LOWER(username) = LOWER($1) LIMIT 1;',
         [username]
       );
 
-      if (!delRows || delRows.length === 0) {
+      if (!userRows || userRows.length === 0) {
         return res.status(404).json({ error: 'User not found.' });
       }
 
-      // 2. Delete any pending or historic reset requests
+      const targetUsername = userRows[0].username;
+      const targetFullName = (userRows[0].full_name || '').trim();
+
+      // 2. Delete user from app_users
+      await (db as any)(
+        'DELETE FROM "app_users" WHERE LOWER(username) = LOWER($1);',
+        [targetUsername]
+      );
+
+      // 3. Delete any pending or historic reset requests
       await (db as any)(
         'DELETE FROM "password_reset_requests" WHERE LOWER(username) = LOWER($1);',
-        [username]
+        [targetUsername]
       );
 
-      // 3. Remove active sessions from users_online
+      // 4. Remove active sessions from users_online
       await (db as any)(
-        "DELETE FROM \"users_online\" WHERE LOWER(name) LIKE '%' || LOWER($1) || '%';",
-        [username]
+        `DELETE FROM "users_online" 
+         WHERE LOWER(name) LIKE '%' || LOWER($1) || '%' 
+            OR (LOWER(name) LIKE '%' || LOWER($2) || '%' AND $2 != '');`,
+        [targetUsername, targetFullName]
       );
 
-      // 4. Broadcast KICK_USER to terminate active session immediately
+      // 5. Purge user records from opname_records so user does not linger on Location Distribution Matrix
+      const deletedOpnames = await (db as any)(
+        `DELETE FROM "opname_records" 
+         WHERE LOWER(user_name) = LOWER($1) 
+            OR (LOWER(user_name) = LOWER($2) AND $2 != '')
+         RETURNING id;`,
+        [targetUsername, targetFullName]
+      );
+
+      // 6. Broadcast events for real-time dashboard and active session sync
       try {
         await (db as any)(
           `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
-          ['KICK_USER', JSON.stringify({ name: username })]
+          ['OPNAME_DELETE', JSON.stringify({ 
+            user_name: targetFullName || targetUsername, 
+            deleted_user: targetUsername,
+            deleted_count: deletedOpnames?.length || 0 
+          })]
         );
         await (db as any)(
           `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
-          ['USER_DELETED', JSON.stringify({ username, deleted_by: authUser.username })]
+          ['KICK_USER', JSON.stringify({ name: targetUsername })]
+        );
+        await (db as any)(
+          `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
+          ['USER_DELETED', JSON.stringify({ username: targetUsername, deleted_by: authUser.username })]
         );
       } catch (e) {}
 
-      return res.status(200).json({ success: true, message: `Account ${username} has been permanently deleted.` });
+      return res.status(200).json({ 
+        success: true, 
+        message: `Account ${targetUsername} (${targetFullName}) and all associated records have been permanently deleted.` 
+      });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

@@ -9,6 +9,7 @@ export interface Translations {
     opnameList: string;
     setting: string;
     database: string;
+    about: string;
   };
   header: {
     title: string;
@@ -108,6 +109,13 @@ export interface Translations {
     actions: string;
     rowsPerPage: string;
     noRecords: string;
+    deleteAll: string;
+    deleteAllModalTitle: string;
+    deleteAllModalDesc: string;
+    deleteAllPrompt: string;
+    deleteAllConfirmBtn: string;
+    deleteAllPlaceholder: string;
+    deleteAllSuccess: string;
   };
   database: {
     title: string;
@@ -145,6 +153,32 @@ export interface Translations {
     systemLockTitle: string;
     systemLockDesc: string;
   };
+  about: {
+    title: string;
+    subtitle: string;
+    companyBadge: string;
+    deptBadge: string;
+    collabBadge: string;
+    authorTitle: string;
+    authorName: string;
+    authorRole: string;
+    authorCompany: string;
+    authorDesc: string;
+    githubProfileBtn: string;
+    githubRepoBtn: string;
+    systemOverviewTitle: string;
+    systemOverviewText: string;
+    techStackTitle: string;
+    frontendStack: string;
+    backendStack: string;
+    databaseStack: string;
+    realtimeStack: string;
+    mobileStack: string;
+    disclaimerTitle: string;
+    disclaimerParagraph1: string;
+    disclaimerParagraph2: string;
+    disclaimerParagraph3: string;
+  };
 }
 
 const idTranslations: Translations = {
@@ -153,7 +187,8 @@ const idTranslations: Translations = {
     opnameSlab: 'Opname Slab',
     opnameList: 'Riwayat Opname',
     setting: 'Pengaturan',
-    database: 'Database Stok'
+    database: 'Database Stok',
+    about: 'Tentang Aplikasi'
   },
   header: {
     title: 'PPIC Slab Stock Opname',
@@ -253,7 +288,14 @@ const idTranslations: Translations = {
     photo: 'Foto',
     actions: 'Aksi',
     rowsPerPage: 'Baris per halaman:',
-    noRecords: 'Tidak ada data rekonsiliasi yang cocok dengan filter.'
+    noRecords: 'Tidak ada data rekonsiliasi yang cocok dengan filter.',
+    deleteAll: 'Hapus Semua Data',
+    deleteAllModalTitle: 'Hapus Semua Data Rekonsiliasi Opname',
+    deleteAllModalDesc: 'PERINGATAN: Tindakan ini akan menghapus seluruh data opname secara permanen dari database Neon dan membersihkan cadangan sinkronisasi storage. Tindakan ini TIDAK dapat dibatalkan.',
+    deleteAllPrompt: 'Ketik "yes i want to delete all list" di bawah ini untuk konfirmasi:',
+    deleteAllConfirmBtn: 'Konfirmasi Hapus Semua Data',
+    deleteAllPlaceholder: 'yes i want to delete all list',
+    deleteAllSuccess: 'Seluruh riwayat rekonsiliasi opname telah berhasil dihapus.'
   },
   database: {
     title: 'Manajemen Database Stok',
@@ -290,6 +332,32 @@ const idTranslations: Translations = {
     newLocationPlaceholder: 'Nama lokasi baru (mis. Yard 3 - Bay A)...',
     systemLockTitle: 'Mode Kunci Sistem Seluruh Aplikasi',
     systemLockDesc: 'Bila aktif, hanya Admin yang dapat mengubah atau menambah data opname.'
+  },
+  about: {
+    title: 'Tentang Aplikasi & Kredensial Pengembang',
+    subtitle: 'Arsitektur, Teknologi, Kolaborasi PPIC, dan Pernyataan Independensi',
+    companyBadge: 'PT Gunung Raja Paksi Tbk',
+    deptBadge: 'Product Development & Technical Service (PDTS)',
+    collabBadge: 'Kolaborasi Data: Departemen PPIC',
+    authorTitle: 'Penulis & Pengembang Sistem',
+    authorName: 'Daniswara M.P.',
+    authorRole: 'Product Development & Technical Service Engineer',
+    authorCompany: 'PT Gunung Raja Paksi Tbk',
+    authorDesc: 'Aplikasi ini merupakan proyek inisiatif pribadi yang dirancang dan dibangun secara mandiri di sela-sela tugas produksi untuk mendukung keandalan proses rekonsiliasi fisik slab.',
+    githubProfileBtn: 'Profil GitHub Penulis',
+    githubRepoBtn: 'Repositori Source Code',
+    systemOverviewTitle: 'Tinjauan Sistem & Tujuan Operasional',
+    systemOverviewText: 'Sistem ini dibangun untuk mendigitalkan dan merekonsiliasi data stock opname fisik slab baja secara real-time terhadap register SAP, Mother Slab, dan Cut Slab. Dilengkapi dengan deteksi duplikasi instan, audit jejak inspektur, toleransi dimensi dinamis, serta bukti visual foto lapangan.',
+    techStackTitle: 'Teknologi & Arsitektur yang Digunakan',
+    frontendStack: 'React 18, TypeScript, Tailwind CSS, Lucide Icons, Recharts, Vite High-Speed Bundler',
+    backendStack: 'Vercel Serverless Edge Architecture, In-Memory DDoS Protection, Crypto Hash (PBKDF2/Scrypt)',
+    databaseStack: 'Neon Serverless PostgreSQL (Cloud-native connection pooling, pgvector ready)',
+    realtimeStack: 'Lightweight Event Polling Engine (system_events table) dengan multi-client presence heartbeat',
+    mobileStack: 'Kompresi Foto Otomatis di Sisi Klien (HTML5 Canvas sub-500KB) untuk efisiensi kuota lapangan',
+    disclaimerTitle: 'Pernyataan Independensi & Penafian Hukum (Disclaimer)',
+    disclaimerParagraph1: 'Aplikasi ini adalah PROYEK PRIBADI yang dikembangkan secara mandiri oleh Product Development & Technical Service Engineer PT Gunung Raja Paksi Tbk di antara jam dinas dan tugas operasional produksi, serta TIDAK DIBIAYAI (NON-COMMISSIONED) oleh perusahaan.',
+    disclaimerParagraph2: 'Seluruh arsitektur perangkat lunak, konfigurasi database, autentikasi real-time, mitigasi DDoS, dan penulisan kode sumber merupakan karya mandiri penulis secara murni sebagai duties support system untuk mendukung kelancaran operasional.',
+    disclaimerParagraph3: 'Seluruh struktur data, format referensi, dan alur validasi opname dikembangkan melalui kolaborasi teknis bersama Departemen PPIC (Production Planning & Inventory Control) PT Gunung Raja Paksi Tbk.'
   }
 };
 
@@ -299,7 +367,8 @@ const enTranslations: Translations = {
     opnameSlab: 'Opname Slab',
     opnameList: 'Opname History',
     setting: 'Settings',
-    database: 'Stock Database'
+    database: 'Stock Database',
+    about: 'About'
   },
   header: {
     title: 'PPIC Slab Stock Opname',
@@ -399,7 +468,14 @@ const enTranslations: Translations = {
     photo: 'Photo',
     actions: 'Actions',
     rowsPerPage: 'Rows per page:',
-    noRecords: 'No reconciliation records matching your filters.'
+    noRecords: 'No reconciliation records matching your filters.',
+    deleteAll: 'Delete All List',
+    deleteAllModalTitle: 'Delete All Opname Reconciliation Records',
+    deleteAllModalDesc: 'DANGER: This action will permanently wipe all opname records from the Neon database and clear the synced storage file. This action CANNOT be undone.',
+    deleteAllPrompt: 'Type "yes i want to delete all list" below to confirm:',
+    deleteAllConfirmBtn: 'Confirm Delete All',
+    deleteAllPlaceholder: 'yes i want to delete all list',
+    deleteAllSuccess: 'All opname reconciliation records have been deleted successfully.'
   },
   database: {
     title: 'Stock Database Management',
@@ -436,6 +512,32 @@ const enTranslations: Translations = {
     newLocationPlaceholder: 'New location name (e.g. Yard 3 - Bay A)...',
     systemLockTitle: 'Global System Lock Mode',
     systemLockDesc: 'When active, only Administrators can submit or modify opname data.'
+  },
+  about: {
+    title: 'About System & Developer Credentials',
+    subtitle: 'System Architecture, Tech Stack, PPIC Collaboration, and Independence Disclaimer',
+    companyBadge: 'PT Gunung Raja Paksi Tbk',
+    deptBadge: 'Product Development & Technical Service (PDTS)',
+    collabBadge: 'Data Collaboration: PPIC Department',
+    authorTitle: 'System Author & Full-Stack Architect',
+    authorName: 'Daniswara M.P.',
+    authorRole: 'Product Development & Technical Service Engineer',
+    authorCompany: 'PT Gunung Raja Paksi Tbk',
+    authorDesc: 'This application is a personal initiative engineered independently between production shifts to deliver high-integrity physical slab stock reconciliation.',
+    githubProfileBtn: 'Author GitHub Profile',
+    githubRepoBtn: 'GitHub Source Repository',
+    systemOverviewTitle: 'System Overview & Operational Purpose',
+    systemOverviewText: 'Built to streamline and digitize physical steel slab stock taking in real time against SAP, Mother Slab, and Cut Slab registers. Features zero-lag duplicate warnings, inspector audit trails, dynamic dimension tolerance, and mobile photo evidence capture.',
+    techStackTitle: 'Technology Stack & Architecture',
+    frontendStack: 'React 18, TypeScript, Tailwind CSS, Lucide Icons, Recharts, Vite High-Speed Bundler',
+    backendStack: 'Vercel Serverless Edge Architecture, In-Memory Rate Limiting / DDoS Shield, Cryptographic Salting (PBKDF2/Scrypt)',
+    databaseStack: 'Neon Serverless PostgreSQL (Cloud-native connection pooling, pgvector ready)',
+    realtimeStack: 'Lightweight Event Polling Engine (system_events table) with multi-client presence tracking',
+    mobileStack: 'Client-Side Canvas Photo Compression (sub-500KB) engineered for rapid cellular field uploads',
+    disclaimerTitle: 'Independence & Legal Disclaimer',
+    disclaimerParagraph1: 'This application is a PERSONAL PROJECT designed and developed independently by a Product Development & Technical Service Engineer of PT Gunung Raja Paksi Tbk between production duties and is NOT COMMISSIONED by the company at all.',
+    disclaimerParagraph2: 'All software architecture, database design, real-time authentication, DDoS protection, and implementation are the author\'s own independent work, engineered purely as a duties-support system without corporate funding or company financial sponsorship.',
+    disclaimerParagraph3: 'All operational datasets, yard schemas, and reconciliation parameters are technical collaborations with the PPIC (Production Planning & Inventory Control) Department of PT Gunung Raja Paksi Tbk.'
   }
 };
 

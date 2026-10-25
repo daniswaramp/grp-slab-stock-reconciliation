@@ -79,10 +79,22 @@ const Database: React.FC<Props> = ({ role, isLocked = false, userName = '' }) =>
   };
 
   const handleClearDataset = async () => {
-    if (!confirm('Are you sure you want to CLEAR ALL OPNAME RECORDS? This action cannot be undone.')) return;
-    if (!confirm('This will delete ALL opname records. Are you absolutely sure?')) return;
+    const confirmation = prompt('DANGER: This action will permanently clear ALL opname records from the database.\n\nPlease type "yes i want to delete all list" to confirm:');
+    if (!confirmation || confirmation.trim().toLowerCase() !== 'yes i want to delete all list') {
+      if (confirmation !== null) {
+        alert('Action cancelled: Confirmation phrase did not match "yes i want to delete all list".');
+      }
+      return;
+    }
     setClearingData(true);
-    try { await clearDataset(); alert('All opname records have been cleared.'); } catch (err) { alert("Error clearing dataset."); } finally { setClearingData(false); }
+    try { 
+      await clearDataset(); 
+      alert('All opname records have been cleared successfully.'); 
+    } catch (err) { 
+      alert("Error clearing dataset."); 
+    } finally { 
+      setClearingData(false); 
+    }
   };
 
   const StockSection = ({ title, type, items, count }: { title: string, type: 'sap' | 'mother' | 'cut', items: any[], count: number }) => (

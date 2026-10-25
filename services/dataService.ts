@@ -64,8 +64,14 @@ export const updateOpnameCacheFromPayload = (eventType: string, oldRecord: any, 
     recordsCache = [newRecord, ...recordsCache];
   } else if (eventType === 'UPDATE' && newRecord) {
     recordsCache = recordsCache.map(r => r.id === newRecord.id ? newRecord : r);
-  } else if (eventType === 'DELETE' && oldRecord) {
-    recordsCache = recordsCache.filter(r => r.id !== oldRecord.id);
+  } else if (eventType === 'DELETE') {
+    if (oldRecord?.id) {
+      recordsCache = recordsCache.filter(r => r.id !== oldRecord.id);
+    } else if (oldRecord?.user_name) {
+      recordsCache = recordsCache.filter(r => r.user_name?.toLowerCase() !== oldRecord.user_name?.toLowerCase());
+    } else {
+      recordsCache = null;
+    }
   }
 };
 

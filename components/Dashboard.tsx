@@ -45,7 +45,13 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
             } else if (payload.eventType === 'UPDATE') {
               updated = updated.map(r => r.id === payload.new.id ? payload.new : r);
             } else if (payload.eventType === 'DELETE') {
-              updated = updated.filter(r => r.id !== payload.old.id);
+              if (payload.old?.id) {
+                updated = updated.filter(r => r.id !== payload.old.id);
+              } else if (payload.old?.user_name) {
+                updated = updated.filter(r => r.user_name?.toLowerCase() !== payload.old.user_name?.toLowerCase());
+              } else {
+                updated = [];
+              }
             }
             return updated;
         });

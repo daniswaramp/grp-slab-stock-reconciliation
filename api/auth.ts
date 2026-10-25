@@ -66,7 +66,7 @@ export default async function handler(req: any, res: any) {
       }
 
       const cleanUsername = username.trim().toLowerCase();
-      const cleanName = full_name.trim();
+      const cleanName = full_name.trim().toUpperCase();
 
       if (cleanUsername.length < 3) {
         return res.status(400).json({ error: 'Username must be at least 3 characters.' });

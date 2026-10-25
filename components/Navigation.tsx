@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Box, ListChecks, Settings, Database } from 'lucide-react';
+import { LayoutDashboard, Box, ListChecks, Settings, Database, Info } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 interface NavigationProps {
@@ -16,6 +16,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
     { id: 'Opname List', label: t.nav.opnameList, icon: ListChecks },
     { id: 'Setting', label: t.nav.setting, icon: Settings },
     { id: 'Database', label: t.nav.database, icon: Database },
+    { id: 'About', label: t.nav.about, icon: Info },
   ];
 
   return (
