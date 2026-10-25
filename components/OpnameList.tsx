@@ -20,6 +20,7 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteAllInput, setDeleteAllInput] = useState('');
   const [deletingAll, setDeletingAll] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const { t } = useI18n();
@@ -326,10 +327,10 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeIn pb-10">
-      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">{t.opnameList.title}</h2>
-          <p className="text-sm text-gray-400">{t.opnameList.subtitle}</p>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">{t.opnameList.title}</h2>
+          <p className="text-xs sm:text-sm text-gray-400">{t.opnameList.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -337,7 +338,7 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg p-0.5 shadow-sm">
               <button
                 onClick={() => handleSort('date')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all ${
                   sortField === 'date'
                     ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-gray-500 hover:text-gray-900'
@@ -345,7 +346,8 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
                 title="Sort by Date (Asc/Desc)"
               >
                 <Calendar size={13} />
-                <span>{t.opnameList.sortByDate}</span>
+                <span className="hidden sm:inline">{t.opnameList.sortByDate}</span>
+                <span className="sm:hidden">Date</span>
                 {sortField === 'date' ? (
                   sortOrder === 'asc' ? <ArrowUp size={12} className="text-blue-600" /> : <ArrowDown size={12} className="text-blue-600" />
                 ) : (
@@ -355,7 +357,7 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
 
               <button
                 onClick={() => handleSort('time')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all ${
                   sortField === 'time'
                     ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-gray-500 hover:text-gray-900'
@@ -363,7 +365,8 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
                 title="Sort by Time (Asc/Desc)"
               >
                 <Clock size={13} />
-                <span>{t.opnameList.sortByTime}</span>
+                <span className="hidden sm:inline">{t.opnameList.sortByTime}</span>
+                <span className="sm:hidden">Time</span>
                 {sortField === 'time' ? (
                   sortOrder === 'asc' ? <ArrowUp size={12} className="text-blue-600" /> : <ArrowDown size={12} className="text-blue-600" />
                 ) : (
@@ -372,13 +375,32 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
               </button>
             </div>
 
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(prev => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                showFilters || Object.values(filters).filter(Boolean).length > 0
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                  : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+              }`}
+              title="Toggle Filters"
+            >
+              <Filter size={13} />
+              <span>Filters</span>
+              {Object.values(filters).filter(Boolean).length > 0 && (
+                <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                  {Object.values(filters).filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
             {role === UserRole.ADMIN && !isLocked && (
               <div className="relative">
                   <button
                       onClick={() => setShowBackupMenu(!showBackupMenu)}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all text-xs"
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-bold flex items-center gap-1.5 transition-all text-xs"
                   >
-                      <Database size={16} /> {t.opnameList.backup} <ChevronDown size={14}/>
+                      <Database size={15} /> <span className="hidden sm:inline">{t.opnameList.backup}</span> <ChevronDown size={13}/>
                   </button>
                   {showBackupMenu && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20">
@@ -398,24 +420,26 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
                   setDeleteAllInput('');
                   setShowDeleteAllModal(true);
                 }}
-                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3.5 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-all active:scale-95 text-xs shadow-sm"
+                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold flex items-center gap-1.5 transition-all active:scale-95 text-xs shadow-sm"
                 title={t.opnameList.deleteAll}
               >
-                <Trash2 size={15} />
-                <span>{t.opnameList.deleteAll}</span>
+                <Trash2 size={14} />
+                <span className="hidden sm:inline">{t.opnameList.deleteAll}</span>
+                <span className="sm:hidden">Delete</span>
               </button>
             )}
 
             <button
-            onClick={exportCSV}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 text-xs"
+              onClick={exportCSV}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold flex items-center gap-1.5 sm:gap-2 transition-all shadow-md active:scale-95 text-xs"
             >
-            <FileSpreadsheet size={16} /> {t.opnameList.exportCsv}
+              <FileSpreadsheet size={15} /> <span className="hidden sm:inline">{t.opnameList.exportCsv}</span><span className="sm:hidden">CSV</span>
             </button>
         </div>
       </div>
 
-      <div className="bg-gray-50 p-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      {/* Collapsible Filter Bar on Mobile */}
+      <div className={`bg-gray-50 p-3 sm:p-4 border-b border-gray-100 ${showFilters ? 'grid' : 'hidden md:grid'} grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5 sm:gap-3 animate-fadeIn`}>
          <div className="flex flex-col">
              <span className="text-[10px] font-bold text-gray-400 uppercase">From Date</span>
              <input type="date" className="border rounded-lg px-2 py-1 text-xs" onChange={e => {setFilters({...filters, startDate: e.target.value}); setCurrentPage(1);}} />
@@ -457,7 +481,7 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
          </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto touch-pan-x">
         <table className="w-full text-left text-xs whitespace-nowrap">
           <thead className="bg-gray-100 text-gray-500 uppercase font-bold tracking-wider">
             <tr>

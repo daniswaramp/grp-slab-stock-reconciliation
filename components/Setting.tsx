@@ -308,7 +308,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
     <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn pb-12">
       {/* Alert for Pending Registrations */}
       {role === UserRole.ADMIN && pendingUsers.length > 0 && (
-        <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+        <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-3">
             <UserPlus className="text-blue-600 shrink-0" size={24} />
             <div>
@@ -320,7 +320,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
           </div>
           <button
             onClick={() => setActiveTab('approvals')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow shrink-0"
           >
             Review Approvals
           </button>
@@ -329,7 +329,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
 
       {/* Alert for Pending Password Resets */}
       {role === UserRole.ADMIN && pendingResets.length > 0 && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-3">
             <AlertTriangle className="text-amber-600 shrink-0" size={24} />
             <div>
@@ -341,7 +341,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
           </div>
           <button
             onClick={() => setActiveTab('resets')}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow shrink-0"
           >
             Review Requests
           </button>
@@ -349,7 +349,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
       )}
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto touch-pan-x scrollbar-none">
         {role === UserRole.ADMIN && (
           <>
             <button

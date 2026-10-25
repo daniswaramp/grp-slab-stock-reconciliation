@@ -204,66 +204,66 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-8 animate-fadeIn pb-10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">{t.dashboard.title}</h2>
-          <p className="text-sm text-gray-500 font-medium">{t.dashboard.subtitle}</p>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">{t.dashboard.title}</h2>
+          <p className="text-xs sm:text-sm text-gray-500 font-medium">{t.dashboard.subtitle}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {(notification || role === UserRole.ADMIN) && (
              <button
                 onClick={openNotifModal}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-sm ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold transition-all shadow-sm ${
                   notification
                     ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 animate-pulse border border-yellow-200'
                     : 'bg-gray-50 text-gray-400 hover:bg-gray-100 border border-gray-100'
                 }`}
              >
-                <Bell size={14} className={notification ? 'fill-yellow-500' : ''} />
-                {notification ? t.dashboard.announcement : t.dashboard.setAnnouncement}
+                <Bell size={13} className={notification ? 'fill-yellow-500' : ''} />
+                <span>{notification ? t.dashboard.announcement : t.dashboard.setAnnouncement}</span>
              </button>
           )}
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100">
-            <Activity size={14} className="animate-pulse" />
-            {t.dashboard.liveUpdates}
+          <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100">
+            <Activity size={13} className="animate-pulse" />
+            <span>{t.dashboard.liveUpdates}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 group">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-              <Users size={24} strokeWidth={2.5} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div className="bg-white p-3.5 sm:p-6 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 group">
+          <div className="flex items-center justify-between mb-2 sm:mb-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 bg-emerald-50 rounded-lg sm:rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+              <Users size={20} strokeWidth={2.5} />
             </div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider rounded-md border border-emerald-200">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-md border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Live
             </span>
           </div>
           <div>
-            <p className="text-3xl font-black text-gray-900 mb-1">
+            <p className="text-2xl sm:text-3xl font-black text-gray-900 mb-0.5 sm:mb-1">
               {usersOnline.filter(u => getUserStatus(u.last_seen)).length}
             </p>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.dashboard.activeOnlineUsers}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide truncate">{t.dashboard.activeOnlineUsers}</p>
           </div>
         </div>
 
         {statusSummary.map((stat) => (
-          <div key={stat.name} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 group relative overflow-hidden">
+          <div key={stat.name} className="bg-white p-3.5 sm:p-6 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 group relative overflow-hidden">
             <div className="absolute right-0 top-0 w-24 h-24 rounded-full opacity-5 -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-150" style={{ backgroundColor: stat.color }}></div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                {stat.name === 'Synchronized' && <ClipboardCheck size={24} strokeWidth={2.5} />}
-                {stat.name === 'Missing Data' && <AlertTriangle size={24} strokeWidth={2.5} />}
-                {stat.name === 'Not Available' && <XCircle size={24} strokeWidth={2.5} />}
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center transition-transform group-hover:scale-110" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                {stat.name === 'Synchronized' && <ClipboardCheck size={20} strokeWidth={2.5} />}
+                {stat.name === 'Missing Data' && <AlertTriangle size={20} strokeWidth={2.5} />}
+                {stat.name === 'Not Available' && <XCircle size={20} strokeWidth={2.5} />}
               </div>
-              <span className="px-2.5 py-1 bg-gray-50 text-gray-400 text-[10px] font-bold uppercase tracking-wider rounded-md">Status</span>
+              <span className="px-2 py-0.5 bg-gray-50 text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-md">Status</span>
             </div>
             <div>
-              <p className="text-3xl font-black text-gray-900 mb-1">{stat.value}</p>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{stat.name}</p>
+              <p className="text-2xl sm:text-3xl font-black text-gray-900 mb-0.5 sm:mb-1">{stat.value}</p>
+              <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide truncate">{stat.name}</p>
             </div>
           </div>
         ))}
@@ -290,13 +290,13 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
             </button>
           </div>
           <div className="overflow-auto flex-1 max-h-[400px]">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-xs sm:text-sm">
               <thead className="bg-white sticky top-0 z-10 border-b border-gray-100">
-                <tr className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm w-16">#</th>
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm">{t.dashboard.inspectorName}</th>
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm">{t.dashboard.lastSeen}</th>
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm text-right">{t.dashboard.status}</th>
+                <tr className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-2.5 sm:py-4 bg-gray-50/80 backdrop-blur-sm w-12">#</th>
+                  <th className="px-3 sm:px-6 py-2.5 sm:py-4 bg-gray-50/80 backdrop-blur-sm">{t.dashboard.inspectorName}</th>
+                  <th className="px-3 sm:px-6 py-2.5 sm:py-4 bg-gray-50/80 backdrop-blur-sm">{t.dashboard.lastSeen}</th>
+                  <th className="px-3 sm:px-6 py-2.5 sm:py-4 bg-gray-50/80 backdrop-blur-sm text-right">{t.dashboard.status}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -305,32 +305,29 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
                   const { displayName, username } = parseUserDisplay(user.name);
                   return (
                     <tr key={user.name} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-6 py-4 text-gray-400 font-medium">{idx + 1}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      <td className="px-3 sm:px-6 py-2.5 sm:py-4 text-gray-400 font-medium">{idx + 1}</td>
+                      <td className="px-3 sm:px-6 py-2.5 sm:py-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0 ${
                             isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
                           }`}>
                             {displayName.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <span className="font-bold text-gray-800 text-sm">{displayName}</span>
+                          <div className="overflow-hidden">
+                            <span className="font-bold text-gray-800 text-xs sm:text-sm truncate block">{displayName}</span>
                             {username && (
-                              <span className="ml-2 text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                              <span className="text-[9px] sm:text-[10px] font-mono text-gray-400 bg-gray-100 px-1 py-0.2 rounded truncate block">
                                 @{username}
                               </span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-mono">
+                      <td className="px-3 sm:px-6 py-2.5 sm:py-4 text-xs font-mono">
                         <span className="text-gray-700 font-semibold">{formatLastSeen(user.last_seen)}</span>
-                        <span className="text-gray-400 text-[10px] ml-1.5">
-                          ({new Date(user.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
-                        </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                      <td className="px-3 sm:px-6 py-2.5 sm:py-4 text-right">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wide ${
                           isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-400 border border-gray-200'
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
@@ -426,24 +423,24 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
             <p className="text-xs text-gray-500">Breakdown of slab counts by user and location</p>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
+        <div className="overflow-x-auto touch-pan-x">
+          <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap">
             <thead className="bg-gray-50/80 backdrop-blur-sm border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">User</th>
+                <th className="px-3 sm:px-6 py-2.5 sm:py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">User</th>
                 {locationStats.length > 0 && Object.keys(locationStats[0]).filter(k => k !== 'name').map(loc => (
-                  <th key={loc} className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center border-l border-gray-100">{loc}</th>
+                  <th key={loc} className="px-3 sm:px-6 py-2.5 sm:py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider text-center border-l border-gray-100">{loc}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {locationStats.map((row, idx) => (
                 <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
-                  <td className="px-6 py-4 font-bold text-gray-700 sticky left-0 bg-white group-hover:bg-indigo-50/30 border-r border-gray-100 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">{row.name}</td>
+                  <td className="px-3 sm:px-6 py-2.5 sm:py-4 font-bold text-gray-700 sticky left-0 bg-white group-hover:bg-indigo-50/30 border-r border-gray-100 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)] text-xs sm:text-sm">{row.name}</td>
                   {Object.keys(row).filter(k => k !== 'name').map(loc => (
-                    <td key={loc} className="px-6 py-4 text-center border-l border-gray-50">
+                    <td key={loc} className="px-3 sm:px-6 py-2.5 sm:py-4 text-center border-l border-gray-50">
                       {row[loc] > 0 ? (
-                        <span className="inline-flex items-center justify-center min-w-[32px] h-8 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold shadow-sm">{row[loc]}</span>
+                        <span className="inline-flex items-center justify-center min-w-[28px] sm:min-w-[32px] h-7 sm:h-8 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold shadow-sm">{row[loc]}</span>
                       ) : (
                         <span className="text-gray-200 font-medium text-xs">-</span>
                       )}

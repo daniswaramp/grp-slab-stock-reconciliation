@@ -20,8 +20,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   ];
 
   return (
-    <div className="bg-white border-b border-gray-100 overflow-x-auto no-scrollbar shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 flex">
+    <div className="bg-white border-b border-gray-100 overflow-x-auto shadow-sm touch-pan-x scrollbar-none">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 flex gap-0.5 sm:gap-0">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -29,14 +29,14 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 px-6 py-4 text-xs font-black transition-all whitespace-nowrap border-b-4 uppercase tracking-wider ${
+              className={`flex items-center gap-1.5 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-4 text-[11px] sm:text-xs font-black transition-all whitespace-nowrap border-b-2 sm:border-b-4 uppercase tracking-wider shrink-0 select-none ${
                 isActive 
-                  ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
+                  ? 'border-blue-600 text-blue-600 bg-blue-50/40' 
                   : 'border-transparent text-gray-400 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Icon size={16} />
-              {tab.label}
+              <Icon size={15} className="shrink-0" />
+              <span>{tab.label}</span>
             </button>
           );
         })}

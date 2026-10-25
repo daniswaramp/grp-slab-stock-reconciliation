@@ -24,27 +24,27 @@ const About: React.FC = () => {
   const { t } = useI18n();
 
   return (
-    <div className="space-y-8 animate-fadeIn pb-12 max-w-7xl mx-auto">
+    <div className="space-y-5 sm:space-y-8 animate-fadeIn pb-12 max-w-7xl mx-auto">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-bold uppercase tracking-wider mb-3">
-              <Boxes size={14} />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 sm:mb-3">
+              <Boxes size={13} />
               <span>PT Gunung Raja Paksi Tbk</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight">{t.about.title}</h1>
-            <p className="text-sm md:text-base text-blue-100/80 mt-1 max-w-2xl">{t.about.subtitle}</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight">{t.about.title}</h1>
+            <p className="text-xs sm:text-sm md:text-base text-blue-100/80 mt-1 max-w-2xl">{t.about.subtitle}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <a
               href={GITHUB_PROFILE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-gray-900 text-xs font-bold shadow-md hover:bg-blue-50 transition-all hover:scale-105 active:scale-95"
+              className="inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white text-gray-900 text-xs font-bold shadow-md hover:bg-blue-50 transition-all active:scale-95 w-full sm:w-auto"
             >
-              <Github size={16} />
+              <Github size={15} />
               <span>{t.about.githubProfileBtn}</span>
               <ExternalLink size={12} className="text-gray-400" />
             </a>
@@ -53,7 +53,7 @@ const About: React.FC = () => {
       </div>
 
       {/* Main Grid: Left Column (Logo & Author) + Right Column (App & Stack & Disclaimer) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-start">
         
         {/* LEFT COLUMN: GRP Brand & Author Credentials */}
         <div className="lg:col-span-4 space-y-6">

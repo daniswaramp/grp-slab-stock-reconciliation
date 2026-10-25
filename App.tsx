@@ -10,7 +10,7 @@ import Database from './components/Database';
 import DatabaseSetup from './components/DatabaseSetup';
 import LockBanner from './components/LockBanner';
 import About from './components/About';
-import { Minus, Plus, Lock, Unlock, X, Info, UserPlus, LogIn, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Minus, Plus, Lock, Unlock, X, Info, UserPlus, LogIn, KeyRound, AlertCircle, CheckCircle2, LogOut } from 'lucide-react';
 import { getSystemNotification, getLockStatus, setLockMode } from './services/dataService';
 import { loginUser, registerUser, requestPasswordReset, getMe, logoutUser } from './services/authService';
 import { useI18n } from './i18n';
@@ -458,7 +458,7 @@ const App: React.FC = () => {
                   autoFocus
                   value={authUsername}
                   onChange={e => setAuthUsername(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 
@@ -482,14 +482,14 @@ const App: React.FC = () => {
                   placeholder="Enter Password"
                   value={authPassword}
                   onChange={e => setAuthPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isAuthLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95 disabled:bg-blue-300 mt-2 flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95 disabled:bg-blue-300 mt-2 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 {isAuthLoading ? 'Signing in...' : 'Sign In'}
               </button>
@@ -521,7 +521,7 @@ const App: React.FC = () => {
                   placeholder="e.g. budi_ppic"
                   value={authUsername}
                   onChange={e => setAuthUsername(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                   autoFocus
                 />
               </div>
@@ -533,7 +533,7 @@ const App: React.FC = () => {
                   placeholder="e.g. BUDI SANTOSO"
                   value={authFullName}
                   onChange={e => setAuthFullName(e.target.value.toUpperCase())}
-                  className="w-full uppercase font-medium border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full uppercase font-medium border border-gray-300 rounded-xl px-4 py-2.5 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 
@@ -544,7 +544,7 @@ const App: React.FC = () => {
                   placeholder="Min. 4 characters"
                   value={authPassword}
                   onChange={e => setAuthPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 
@@ -555,7 +555,7 @@ const App: React.FC = () => {
                   placeholder="Re-type Password"
                   value={authConfirmPassword}
                   onChange={e => setAuthConfirmPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 
@@ -646,12 +646,12 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col" style={{ zoom: uiScale }}>
+    <div className="min-h-screen bg-white flex flex-col" style={{ zoom: typeof window !== 'undefined' && window.innerWidth >= 768 ? uiScale : undefined }}>
       <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 md:gap-4 overflow-hidden shrink-0">
-            <img src={LOGO_URL} alt="GRP" className="h-8 md:h-10 object-contain" />
-            <div className="h-6 w-[1px] bg-gray-200 hidden xs:block"></div>
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-3 overflow-hidden shrink-0">
+            <img src={LOGO_URL} alt="GRP" className="h-7 sm:h-9 object-contain" />
+            <div className="h-5 w-[1px] bg-gray-200 hidden sm:block"></div>
             <div className="hidden sm:block">
               <h1 className="text-xs md:text-sm font-black text-gray-900 truncate uppercase tracking-tighter">
                 {t.header.title}
@@ -660,12 +660,12 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Language Switcher */}
             <div className="flex items-center bg-gray-100 rounded-lg p-0.5 border border-gray-200 shadow-inner">
               <button
                 onClick={() => setLanguage('id')}
-                className={`px-2 py-1 rounded text-[10px] font-black tracking-wider transition-all ${
+                className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] font-black tracking-wider transition-all ${
                   language === 'id'
                     ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-gray-400 hover:text-gray-700'
@@ -676,7 +676,7 @@ const App: React.FC = () => {
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-2 py-1 rounded text-[10px] font-black tracking-wider transition-all ${
+                className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] font-black tracking-wider transition-all ${
                   language === 'en'
                     ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-gray-400 hover:text-gray-700'
@@ -687,7 +687,8 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200 p-1">
+            {/* Scale adjustment (Desktop only) */}
+            <div className="hidden md:flex items-center bg-gray-50 rounded-lg border border-gray-200 p-1">
               <button
                 onClick={() => adjustScale(-0.1)}
                 className="p-1.5 hover:bg-white rounded transition-colors text-gray-600"
@@ -709,19 +710,19 @@ const App: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowOnlinePopover(prev => !prev)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-full text-xs font-bold border border-emerald-200 transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-full text-xs font-bold border border-emerald-200 transition-all shadow-sm active:scale-95"
                 title="View Connected Users"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="font-mono font-black">{activeOnlineUsers.length}</span>
+                <span className="font-mono font-black text-[11px] sm:text-xs">{activeOnlineUsers.length}</span>
                 <span className="hidden sm:inline text-[11px] font-bold">Online</span>
               </button>
 
               {showOnlinePopover && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-50 animate-fadeIn">
+                <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-20px)] bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-50 animate-fadeIn">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
                     <span className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-50 animate-pulse"></span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                       Active Users ({activeOnlineUsers.length})
                     </span>
                     <button
@@ -740,18 +741,18 @@ const App: React.FC = () => {
                       return (
                         <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-gray-50/80 hover:bg-blue-50/50 transition-colors">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
                               {displayName.charAt(0).toUpperCase()}
                             </div>
-                            <div>
-                              <p className="text-xs font-bold text-gray-800 leading-tight">
+                            <div className="overflow-hidden">
+                              <p className="text-xs font-bold text-gray-800 leading-tight truncate">
                                 {displayName}
                                 {isMe && <span className="ml-1 text-[9px] bg-blue-100 text-blue-600 px-1 py-0.2 rounded font-bold">You</span>}
                               </p>
-                              {uname && <p className="text-[10px] text-gray-400 font-mono">{uname}</p>}
+                              {uname && <p className="text-[10px] text-gray-400 font-mono truncate">{uname}</p>}
                             </div>
                           </div>
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 shrink-0">
                             Active
                           </span>
                         </div>
@@ -765,12 +766,12 @@ const App: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 md:gap-3 md:border-r md:pr-6 border-gray-100">
+            <div className="flex items-center gap-1.5 sm:gap-3 sm:border-r sm:pr-4 border-gray-100">
               {role === UserRole.ADMIN && (
                 <button
                   onClick={handleToggleLock}
                   disabled={togglingLock}
-                  className={`p-2 rounded-lg transition-all ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-all ${
                     lockStatus.lock_mode
                       ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -778,27 +779,30 @@ const App: React.FC = () => {
                   title={lockStatus.lock_mode ? 'Unlock System' : 'Lock System'}
                 >
                   {togglingLock ? (
-                    <Minus size={16} className="animate-spin" />
+                    <Minus size={15} className="animate-spin" />
                   ) : lockStatus.lock_mode ? (
-                    <Lock size={16} />
+                    <Lock size={15} />
                   ) : (
-                    <Unlock size={16} />
+                    <Unlock size={15} />
                   )}
                 </button>
               )}
-              <div className="text-right hidden xs:block">
-                <p className="text-xs font-bold text-gray-900">{userName}</p>
+              <div className="text-right hidden md:block">
+                <p className="text-xs font-bold text-gray-900 leading-tight">{userName}</p>
                 <p className="text-[9px] uppercase tracking-wider text-blue-500 font-black">{role}</p>
               </div>
-              <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-inner">
+              <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-inner shrink-0" title={`${userName} (${role})`}>
                 {userName.charAt(0).toUpperCase()}
               </div>
             </div>
+
             <button
               onClick={handleLogout}
-              className="text-[10px] md:text-xs font-black text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest"
+              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest flex items-center gap-1"
+              title={t.header.signOut}
             >
-              {t.header.signOut}
+              <LogOut size={16} className="text-gray-500 hover:text-red-600" />
+              <span className="hidden sm:inline text-xs font-black">{t.header.signOut}</span>
             </button>
           </div>
         </div>
