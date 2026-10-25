@@ -92,17 +92,25 @@ export default async function handler(req: any, res: any) {
       const salt = crypto.randomBytes(16).toString('hex');
       const hash = hashPassword(password, salt);
 
-      // New users start as pending_approval and is_active: false
+      // New users are automatically approved and active directly (no admin approval required for signup)
       const rows = await (db as any)(
         `INSERT INTO "app_users" (username, full_name, password_hash, salt, role, is_active, status)
-         VALUES ($1, $2, $3, $4, 'user', false, 'pending_approval')
+         VALUES ($1, $2, $3, $4, 'user', true, 'approved')
          RETURNING id, username, full_name, role, status;`,
         [cleanUsername, cleanName, hash, salt]
       );
 
       const user = rows[0];
 
-      // Broadcast registration event to alert admin
+      // Generate signed session token for instant seamless login
+      const token = createToken({
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        role: user.role
+      });
+
+      // Broadcast registration event
       try {
         await (db as any)(
           `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
@@ -112,8 +120,9 @@ export default async function handler(req: any, res: any) {
 
       return res.status(200).json({
         success: true,
-        pendingApproval: true,
-        message: 'Account created successfully! Your account is pending Administrator approval before you can log in.',
+        pendingApproval: false,
+        token,
+        message: 'Account created successfully! Welcome to GRP Slab Opname.',
         user: {
           id: user.id,
           username: user.username,

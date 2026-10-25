@@ -602,7 +602,7 @@ const App: React.FC = () => {
                   placeholder="Enter your registered username"
                   value={authUsername}
                   onChange={e => setAuthUsername(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                   autoFocus
                 />
               </div>
@@ -614,7 +614,7 @@ const App: React.FC = () => {
                   placeholder="e.g. Please reset to temp123 or I forgot my password"
                   value={forgotNotes}
                   onChange={e => setForgotNotes(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-xs focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-base sm:text-sm focus:ring-4 focus:ring-blue-50 outline-none transition-all focus:border-blue-500 text-gray-900 bg-white"
                 />
               </div>
 

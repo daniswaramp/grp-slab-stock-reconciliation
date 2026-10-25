@@ -53,7 +53,7 @@ export const registerUser = async (
   username: string,
   full_name: string,
   password: string
-): Promise<{ user: AuthUser; pendingApproval: boolean; message: string }> => {
+): Promise<{ user: AuthUser; pendingApproval: boolean; token?: string; message: string }> => {
   const res = await fetch('/api/auth', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,10 +65,15 @@ export const registerUser = async (
     throw new Error(json.error || 'Registration failed');
   }
 
+  if (json.token) {
+    localStorage.setItem('slab_opname_token', json.token);
+  }
+
   return {
     user: json.user,
     pendingApproval: !!json.pendingApproval,
-    message: json.message || 'Account created successfully! Awaiting Administrator approval.'
+    token: json.token,
+    message: json.message || 'Account created successfully!'
   };
 };
 

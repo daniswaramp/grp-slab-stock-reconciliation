@@ -353,20 +353,6 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
         {role === UserRole.ADMIN && (
           <>
             <button
-              onClick={() => setActiveTab('approvals')}
-              className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 relative shrink-0 ${
-                activeTab === 'approvals' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <UserPlus size={16} /> {t.setting.pendingTab}
-              {pendingUsers.length > 0 && (
-                <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                  {pendingUsers.length}
-                </span>
-              )}
-            </button>
-
-            <button
               onClick={() => setActiveTab('users')}
               className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 shrink-0 ${
                 activeTab === 'users' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
@@ -388,6 +374,20 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                 </span>
               )}
             </button>
+
+            {pendingUsers.length > 0 && (
+              <button
+                onClick={() => setActiveTab('approvals')}
+                className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 relative shrink-0 ${
+                  activeTab === 'approvals' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <UserPlus size={16} /> {t.setting.pendingTab}
+                <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {pendingUsers.length}
+                </span>
+              </button>
+            )}
           </>
         )}
 
