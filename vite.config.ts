@@ -68,6 +68,12 @@ export default defineConfig(({ mode }) => {
                 } else if (route === 'events') {
                   const mod = await server.ssrLoadModule('/api/events.ts');
                   return await mod.default(reqAdapter, resAdapter);
+                } else if (route === 'auth') {
+                  const mod = await server.ssrLoadModule('/api/auth.ts');
+                  return await mod.default(reqAdapter, resAdapter);
+                } else if (route === 'admin') {
+                  const mod = await server.ssrLoadModule('/api/admin.ts');
+                  return await mod.default(reqAdapter, resAdapter);
                 }
               } catch (err: any) {
                 console.error('Local API dev server error:', err);

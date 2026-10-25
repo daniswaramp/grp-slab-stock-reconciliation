@@ -25,3 +25,5 @@ backups/
 data/
 
 *.py
+.vercel
+.env*

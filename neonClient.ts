@@ -1,17 +1,50 @@
 /**
  * Neon Client for React / Vite
- * Provides a drop-in Supabase-compatible client interface backed by Neon PostgreSQL and Vercel Serverless Functions.
+ * Backed by Neon Serverless PostgreSQL and Vercel Serverless Functions.
+ * Includes client-side image compression, smart visibility polling, and full Supabase-compatible interface.
  */
 
-// Helper to convert File or Blob to Base64 or Text
+// Compress Image using Canvas before upload to conserve storage & bandwidth on Free Tier
 async function readBlobData(blob: Blob): Promise<{ data: string; mime: string }> {
   const mime = blob.type || 'application/octet-stream';
   if (mime.startsWith('image/')) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve({ data: reader.result as string, mime });
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const maxDim = 1280;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+          resolve({ data: compressedDataUrl, mime: 'image/jpeg' });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => resolve({ data: reader.result as string, mime: 'image/jpeg' });
+        reader.readAsDataURL(blob);
+      };
+      img.onerror = () => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ data: reader.result as string, mime });
+        reader.readAsDataURL(blob);
+      };
+      img.src = url;
     });
   } else {
     const text = await blob.text();
@@ -19,12 +52,25 @@ async function readBlobData(blob: Blob): Promise<{ data: string; mime: string }>
   }
 }
 
-// Global Event Dispatcher for Realtime Multiuser sync
+// Global Event Dispatcher with Visibility State awareness (stops polling when tab is hidden)
 class RealtimeManager {
   private lastEventId = 0;
   private pollInterval: any = null;
   private channels = new Set<NeonChannel>();
   private isPolling = false;
+
+  constructor() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.stopPolling();
+        } else if (this.channels.size > 0) {
+          this.poll();
+          this.startPolling();
+        }
+      });
+    }
+  }
 
   addChannel(channel: NeonChannel) {
     this.channels.add(channel);
@@ -39,10 +85,8 @@ class RealtimeManager {
   }
 
   private startPolling() {
-    if (this.pollInterval) return;
-    // Initial fetch to get latest event ID so we don't replay old history
-    this.poll();
-    this.pollInterval = setInterval(() => this.poll(), 2500);
+    if (this.pollInterval || (typeof document !== 'undefined' && document.hidden)) return;
+    this.pollInterval = setInterval(() => this.poll(), 5000);
   }
 
   private stopPolling() {
@@ -173,6 +217,7 @@ class QueryBuilder {
   private countMode?: string;
   private headMode = false;
   private isSingle = false;
+  private wantsReturning = false;
   private pendingAction: 'select' | 'update' | 'delete' = 'select';
   private updateValues?: any;
 
@@ -180,6 +225,7 @@ class QueryBuilder {
 
   select(columns = '*', options?: { count?: 'exact'; head?: boolean }) {
     this.columns = columns;
+    this.wantsReturning = true;
     if (options?.count) this.countMode = options.count;
     if (options?.head) this.headMode = options.head;
     return this;
@@ -250,6 +296,7 @@ class QueryBuilder {
         body.single = this.isSingle;
       } else if (this.pendingAction === 'update') {
         body.values = this.updateValues;
+        body.select = this.wantsReturning || true; // Always return updated rows
       }
 
       const res = await fetch('/api/query', {
