@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb } from './db.js';
 
 const ALLOWED_TABLES = new Set([
   'sap_stock',
