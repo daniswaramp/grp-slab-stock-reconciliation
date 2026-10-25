@@ -201,8 +201,8 @@ export const saveOpnameRecord = async (record: OpnameRecord) => {
     database_t: record.database_t ? Number(record.database_t) : null,
     database_w: record.database_w ? Number(record.database_w) : null,
     database_l: record.database_l ? Number(record.database_l) : null,
-    date: new Date().toISOString().split('T')[0],
-    time: new Date().toLocaleTimeString('en-GB', { hour12: false })
+    date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()),
+    time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date())
   };
 
   const { data, error } = await supabase
@@ -211,20 +211,11 @@ export const saveOpnameRecord = async (record: OpnameRecord) => {
   
   if (error) throw error;
 
-  // Manually update cache if needed, but usually the subscription will catch it.
-  // However, syncOpnameListToStorage needs latest data.
-  // We should update cache immediately to ensure sync uses it.
-  // Note: 'data' from insert might be null if 'select' wasn't chained, but usually it returns inserted row if .select() is added.
-  // The current code doesn't do .select() on insert.
+  // Immediate local cache update for smooth UI without expensive O(N) CSV write
+  if (data && data.length > 0) {
+    updateOpnameCacheFromPayload('INSERT', null, data[0]);
+  }
 
-  // To keep it simple: syncOpnameListToStorage will re-fetch EVERYTHING.
-  // Optimization: We can just let it fetch cache.
-  // Ideally, the subscription in UI handles the cache update.
-  // For backend consistency, we might want to force reload for the sync, OR trust the subscription propagation.
-  // Given user wants "no lag", relying on cache is better.
-  // But wait, saveOpnameRecord doesn't return the full object with ID unless we select().
-
-  await syncOpnameListToStorage();
   return data;
 };
 
@@ -309,14 +300,10 @@ export const loadBackup = async (backupId: string) => {
     // Restore from backup
     const recordsToInsert = (backup.data as any[]).map(r => r);
 
-    // CHANGED: Use chunked insert for restoration to avoid payload limits
+    // Safe batch replacement into database
     if (recordsToInsert.length > 0) {
-        const CHUNK_SIZE = 1000;
-        for (let i = 0; i < recordsToInsert.length; i += CHUNK_SIZE) {
-            const chunk = recordsToInsert.slice(i, i + CHUNK_SIZE);
-            const { error: insertError } = await supabase.from('opname_records').insert(chunk);
-            if (insertError) throw insertError;
-        }
+      const { error: insertError } = await (supabase.from('opname_records') as any).replaceRows(recordsToInsert);
+      if (insertError) throw insertError;
     }
 
     // Force refresh cache after restore
@@ -343,10 +330,6 @@ export const uploadStockCSV = async (type: 'sap' | 'mother' | 'cut', records: Sl
     upsert: true
   });
   
-  await supabase.from(table).delete().neq('batch_id', '___FORCE_CLEAR___');
-  
-  // CHANGED: Chunked insert for stock upload as well to be safe
-  const CHUNK_SIZE = 1000;
   const dbRecords = records.map(r => ({
     batch_id: r.batch_id,
     grade: r.grade,
@@ -356,11 +339,8 @@ export const uploadStockCSV = async (type: 'sap' | 'mother' | 'cut', records: Sl
     slab_weight: r.slab_weight
   }));
 
-  for (let i = 0; i < dbRecords.length; i += CHUNK_SIZE) {
-      const chunk = dbRecords.slice(i, i + CHUNK_SIZE);
-      const { error } = await supabase.from(table).insert(chunk);
-      if (error) throw error;
-  }
+  const { error } = await (supabase.from(table) as any).replaceRows(dbRecords);
+  if (error) throw error;
 };
 
 export const fetchLocations = async () => {

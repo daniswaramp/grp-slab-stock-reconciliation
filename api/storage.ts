@@ -1,9 +1,10 @@
 import { getDb } from './db.js';
+import { verifyToken } from './auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -12,7 +13,7 @@ export default async function handler(req: any, res: any) {
   try {
     const db = getDb();
 
-    // 1. GET FILE
+    // 1. GET FILE (Public for direct image preview)
     if (req.method === 'GET') {
       const filePath = req.query.path as string;
       if (!filePath) {
@@ -32,7 +33,7 @@ export default async function handler(req: any, res: any) {
       const mime = file.mime_type || 'application/octet-stream';
 
       res.setHeader('Content-Type', mime);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
 
       if (file.data.startsWith('data:') && file.data.includes(';base64,')) {
         const base64Data = file.data.split(';base64,')[1];
@@ -44,6 +45,12 @@ export default async function handler(req: any, res: any) {
       } else {
         return res.send(file.data);
       }
+    }
+
+    // Authenticate POST and DELETE
+    const authUser = verifyToken(req.headers.authorization);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Authentication required for storage modifications.' });
     }
 
     // 2. UPLOAD FILE

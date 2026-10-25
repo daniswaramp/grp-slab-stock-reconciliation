@@ -1,5 +1,6 @@
 {
   "framework": "vite",
+  "regions": ["iad1"],
   "rewrites": [
     {
       "source": "/((?!api/.*).*)",

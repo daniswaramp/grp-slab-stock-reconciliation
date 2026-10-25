@@ -4,6 +4,12 @@
  * Includes client-side image compression, smart visibility polling, and full Supabase-compatible interface.
  */
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof localStorage === 'undefined') return {};
+  const token = localStorage.getItem('slab_opname_token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
 // Compress Image using Canvas before upload to conserve storage & bandwidth on Free Tier
 async function readBlobData(blob: Blob): Promise<{ data: string; mime: string }> {
   const mime = blob.type || 'application/octet-stream';
@@ -54,7 +60,7 @@ async function readBlobData(blob: Blob): Promise<{ data: string; mime: string }>
 
 // Global Event Dispatcher with Visibility State awareness (stops polling when tab is hidden)
 class RealtimeManager {
-  private lastEventId = 0;
+  private lastEventId = -1; // -1 means uninitialized
   private pollInterval: any = null;
   private channels = new Set<NeonChannel>();
   private isPolling = false;
@@ -101,7 +107,24 @@ class RealtimeManager {
     this.isPolling = true;
 
     try {
-      const res = await fetch(`/api/events?since_id=${this.lastEventId}`);
+      // 1. Initial connection: fetch latest_id to skip historic events
+      if (this.lastEventId === -1) {
+        const initRes = await fetch('/api/events?latest=true', {
+          headers: { ...getAuthHeaders() }
+        });
+        if (initRes.ok) {
+          const initJson = await initRes.json();
+          this.lastEventId = typeof initJson.latest_id === 'number' ? initJson.latest_id : 0;
+        } else {
+          this.lastEventId = 0;
+        }
+        return;
+      }
+
+      // 2. Poll for new events since last seen ID
+      const res = await fetch(`/api/events?since_id=${this.lastEventId}`, {
+        headers: { ...getAuthHeaders() }
+      });
       if (!res.ok) return;
       const { events } = await res.json();
 
@@ -158,7 +181,10 @@ export class NeonChannel {
   async send(msg: { type: string; event: string; payload: any }) {
     await fetch('/api/events', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
       body: JSON.stringify({
         event_type: msg.event,
         payload: msg.payload
@@ -194,6 +220,9 @@ export class NeonChannel {
         } else if (evt.event_type.startsWith('SETTINGS_') && targetTable === 'system_settings') {
           matched = true;
           changeType = evt.event_type.replace('SETTINGS_', '');
+        } else if (evt.event_type.startsWith('USERS_ONLINE_') && targetTable === 'users_online') {
+          matched = true;
+          changeType = evt.event_type.replace('USERS_ONLINE_', '');
         }
 
         if (matched && (!targetEvent || targetEvent === '*' || targetEvent === changeType)) {
@@ -296,12 +325,15 @@ class QueryBuilder {
         body.single = this.isSingle;
       } else if (this.pendingAction === 'update') {
         body.values = this.updateValues;
-        body.select = this.wantsReturning || true; // Always return updated rows
+        body.select = this.wantsReturning || true;
       }
 
       const res = await fetch('/api/query', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
         body: JSON.stringify(body)
       });
 
@@ -331,7 +363,10 @@ export const neonClient = {
         try {
           const res = await fetch('/api/query', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders()
+            },
             body: JSON.stringify({ action: 'insert', table, rows, select: true })
           });
           const json = await res.json();
@@ -345,12 +380,32 @@ export const neonClient = {
         try {
           const res = await fetch('/api/query', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders()
+            },
             body: JSON.stringify({ action: 'upsert', table, rows, conflictCol: options?.conflictCol, select: true })
           });
           const json = await res.json();
           if (!res.ok) return { data: null, error: { message: json.error || res.statusText } };
           return { data: json.data, error: null };
+        } catch (err: any) {
+          return { data: null, error: { message: err.message } };
+        }
+      },
+      async replaceRows(rows: any[]) {
+        try {
+          const res = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders()
+            },
+            body: JSON.stringify({ action: 'replace_table_rows', table, rows })
+          });
+          const json = await res.json();
+          if (!res.ok) return { data: null, error: { message: json.error || res.statusText } };
+          return { data: json, error: null };
         } catch (err: any) {
           return { data: null, error: { message: err.message } };
         }
@@ -372,7 +427,10 @@ export const neonClient = {
             const { data, mime } = await readBlobData(fileOrBlob);
             const res = await fetch('/api/storage', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+              },
               body: JSON.stringify({ path, mime_type: mime, data })
             });
             const json = await res.json();
@@ -395,7 +453,10 @@ export const neonClient = {
           try {
             const res = await fetch('/api/storage', {
               method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+              },
               body: JSON.stringify({ paths })
             });
             if (!res.ok) {

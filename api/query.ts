@@ -1,4 +1,5 @@
 import { getDb } from './db.js';
+import { verifyToken } from './auth.js';
 
 const ALLOWED_TABLES = new Set([
   'sap_stock',
@@ -38,9 +39,16 @@ export default async function handler(req: any, res: any) {
     const db = getDb();
     const { action, table, columns = '*', filters = [], orderBy, limit, offset, rows, values, conflictCol, select = false } = req.body;
 
+    // Public Ping / Health check
     if (action === 'ping') {
       const result = await (db as any)('SELECT 1 as connected;');
       return res.status(200).json({ data: result });
+    }
+
+    // Server-side Authentication
+    const authUser = verifyToken(req.headers.authorization);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Authentication required. Please log in.' });
     }
 
     if (!table || !ALLOWED_TABLES.has(table)) {
@@ -48,6 +56,14 @@ export default async function handler(req: any, res: any) {
     }
 
     const safeTable = sanitizeIdentifier(table);
+
+    // Lock Mode Enforcement for Mutation Actions
+    if (['insert', 'update', 'upsert', 'delete', 'replace_table_rows'].includes(action)) {
+      const settings = await (db as any)('SELECT lock_mode FROM "system_settings" WHERE id = 1 LIMIT 1;');
+      if (settings && settings[0]?.lock_mode && authUser.role !== 'admin') {
+        return res.status(423).json({ error: 'System is locked by Administrator. Data modifications are temporarily disabled.' });
+      }
+    }
 
     // 1. SELECT
     if (action === 'select') {
@@ -140,7 +156,7 @@ export default async function handler(req: any, res: any) {
           const eventType = table === 'opname_records' ? 'OPNAME_INSERT' : 'LOCATION_INSERT';
           await (db as any)(
             `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
-            [eventType, JSON.stringify(items[0])]
+            [eventType, JSON.stringify(result?.[0] || items[0])]
           );
         }
       } catch (e) {
@@ -217,7 +233,7 @@ export default async function handler(req: any, res: any) {
           const eventType = table === 'system_settings' ? 'SETTINGS_UPDATE' : 'OPNAME_UPDATE';
           await (db as any)(
             `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
-            [eventType, JSON.stringify(values)]
+            [eventType, JSON.stringify(result?.[0] || values)]
           );
         }
       } catch (e) {
@@ -246,13 +262,15 @@ export default async function handler(req: any, res: any) {
       const query = `DELETE FROM ${safeTable} ${whereClause};`;
       await (db as any)(query, params);
 
-      // Log event
+      // Log event with exact payload for cache eviction
       try {
         if (table === 'opname_records' || table === 'locations' || table === 'users_online') {
           const eventType = `${table.toUpperCase()}_DELETE`;
+          const idFilter = filters.find((f: any) => f.column === 'id');
+          const nameFilter = filters.find((f: any) => f.column === 'name');
           await (db as any)(
             `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
-            [eventType, JSON.stringify({ filters })]
+            [eventType, JSON.stringify({ id: idFilter?.value, name: nameFilter?.value, filters })]
           );
         }
       } catch (e) {
@@ -260,6 +278,43 @@ export default async function handler(req: any, res: any) {
       }
 
       return res.status(200).json({ success: true });
+    }
+
+    // 6. REPLACE TABLE ROWS (Safe Batch Atomic Stock CSV Replacement)
+    if (action === 'replace_table_rows') {
+      if (!['sap_stock', 'mother_slab_stock', 'cut_slab_stock', 'opname_records'].includes(table)) {
+        return res.status(400).json({ error: `Replacement not allowed for table '${table}'` });
+      }
+
+      const items = Array.isArray(rows) ? rows : [];
+
+      // Clear existing records
+      await (db as any)(`DELETE FROM ${safeTable};`);
+
+      if (items.length > 0) {
+        const keys = Object.keys(items[0]);
+        const safeCols = keys.map(k => sanitizeIdentifier(k)).join(', ');
+        const CHUNK_SIZE = 500;
+
+        for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+          const chunk = items.slice(i, i + CHUNK_SIZE);
+          const params: any[] = [];
+          const rowClauses = chunk.map(item => {
+            const placeholders = keys.map(k => {
+              params.push(item[k] !== undefined ? item[k] : null);
+              return `$${params.length}`;
+            });
+            return `(${placeholders.join(', ')})`;
+          });
+
+          await (db as any)(
+            `INSERT INTO ${safeTable} (${safeCols}) VALUES ${rowClauses.join(', ')};`,
+            params
+          );
+        }
+      }
+
+      return res.status(200).json({ success: true, count: items.length });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

@@ -11,7 +11,7 @@ import DatabaseSetup from './components/DatabaseSetup';
 import LockBanner from './components/LockBanner';
 import { Minus, Plus, Lock, Unlock, X, Info, UserPlus, LogIn, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getSystemNotification, getLockStatus, setLockMode } from './services/dataService';
-import { loginUser, registerUser, requestPasswordReset } from './services/authService';
+import { loginUser, registerUser, requestPasswordReset, getMe, logoutUser } from './services/authService';
 
 const App: React.FC = () => {
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('slab_opname_user'));
@@ -47,9 +47,27 @@ const App: React.FC = () => {
   useEffect(() => {
     checkDatabase();
     fetchLockStatus();
+
+    const token = localStorage.getItem('slab_opname_token');
+    if (token) {
+      getMe().then(user => {
+        if (user) {
+          const userRole = user.role === 'admin' ? UserRole.ADMIN : UserRole.USER;
+          const displayName = user.full_name || user.username;
+          setUserName(displayName);
+          setRole(userRole);
+          localStorage.setItem('slab_opname_user', displayName);
+          localStorage.setItem('slab_opname_username', user.username);
+          localStorage.setItem('slab_opname_role', userRole);
+        } else {
+          handleLogout();
+        }
+      });
+    }
   }, []);
 
   const handleLogout = useCallback(() => {
+    logoutUser();
     setUserName(null);
     setAuthUsername('');
     setAuthPassword('');
@@ -57,9 +75,6 @@ const App: React.FC = () => {
     setAuthFullName('');
     setAuthError(null);
     setAuthSuccess(null);
-    localStorage.removeItem('slab_opname_user');
-    localStorage.removeItem('slab_opname_role');
-    localStorage.removeItem('slab_opname_username');
     sessionStorage.removeItem('hasSeenNotification');
   }, []);
 
@@ -80,7 +95,8 @@ const App: React.FC = () => {
     const systemChannel = supabase
       .channel('system-signals')
       .on('broadcast', { event: 'KICK_USER' }, ({ payload }) => {
-        if (payload.name === userName) {
+        const myUsername = localStorage.getItem('slab_opname_username');
+        if (payload.name === userName || payload.name === myUsername || (myUsername && payload.name?.includes(myUsername))) {
           alert('SECURITY ALERT: Your session has been terminated by the Administrator.');
           handleLogout();
         }
@@ -172,11 +188,13 @@ const App: React.FC = () => {
 
   const updateUserStatus = async (name: string, isInitial: boolean) => {
     try {
+      const u = localStorage.getItem('slab_opname_username') || name;
+      const sessionKey = `${name} (${u})`;
       if (isInitial) {
         await supabase.from('users_online').upsert(
           [
             {
-              name,
+              name: sessionKey,
               last_seen: new Date().toISOString()
             }
           ],
@@ -186,7 +204,7 @@ const App: React.FC = () => {
         const { data, error } = await supabase
           .from('users_online')
           .update({ last_seen: new Date().toISOString() })
-          .eq('name', name)
+          .eq('name', sessionKey)
           .select();
 
         if (!error && data && data.length === 0) {
@@ -248,17 +266,27 @@ const App: React.FC = () => {
 
     setIsAuthLoading(true);
     try {
-      const user = await registerUser(u, fn, authPassword);
-      setAuthSuccess(`Account created for ${user.full_name}! Logging you in...`);
-      setTimeout(() => {
-        const userRole = user.role === 'admin' ? UserRole.ADMIN : UserRole.USER;
-        const displayName = user.full_name || user.username;
-        setUserName(displayName);
-        setRole(userRole);
-        localStorage.setItem('slab_opname_user', displayName);
-        localStorage.setItem('slab_opname_username', user.username);
-        localStorage.setItem('slab_opname_role', userRole);
-      }, 700);
+      const res = await registerUser(u, fn, authPassword);
+      if (res.pendingApproval) {
+        setAuthSuccess(res.message || 'Account created successfully! Your account is pending Administrator approval before you can log in.');
+        setAuthUsername('');
+        setAuthFullName('');
+        setAuthPassword('');
+        setAuthConfirmPassword('');
+        setAuthMode('login');
+      } else {
+        const user = res.user;
+        setAuthSuccess(`Account created for ${user.full_name}! Logging you in...`);
+        setTimeout(() => {
+          const userRole = user.role === 'admin' ? UserRole.ADMIN : UserRole.USER;
+          const displayName = user.full_name || user.username;
+          setUserName(displayName);
+          setRole(userRole);
+          localStorage.setItem('slab_opname_user', displayName);
+          localStorage.setItem('slab_opname_username', user.username);
+          localStorage.setItem('slab_opname_role', userRole);
+        }, 700);
+      }
     } catch (err: any) {
       setAuthError(err.message || 'Registration failed.');
     } finally {

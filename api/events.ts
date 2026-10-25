@@ -1,9 +1,10 @@
 import { getDb } from './db.js';
+import { verifyToken } from './auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -12,8 +13,14 @@ export default async function handler(req: any, res: any) {
   try {
     const db = getDb();
 
-    // 1. GET RECENT EVENTS SINCE ID
+    // 1. GET RECENT EVENTS SINCE ID OR GET LATEST ID (to prevent historic replay)
     if (req.method === 'GET') {
+      if (req.query.latest === 'true' || req.query.since_id === 'latest') {
+        const maxRes = await (db as any)('SELECT COALESCE(MAX(id), 0)::int as max_id FROM "system_events";');
+        const maxId = maxRes[0]?.max_id || 0;
+        return res.status(200).json({ events: [], latest_id: maxId });
+      }
+
       const sinceId = parseInt(req.query.since_id as string, 10) || 0;
 
       const events = await (db as any)(
@@ -26,6 +33,11 @@ export default async function handler(req: any, res: any) {
 
     // 2. BROADCAST AN EVENT
     if (req.method === 'POST') {
+      const authUser = verifyToken(req.headers.authorization);
+      if (!authUser) {
+        return res.status(401).json({ error: 'Authentication required to broadcast events.' });
+      }
+
       const { event_type, payload = {} } = req.body;
       if (!event_type) {
         return res.status(400).json({ error: 'Missing event_type' });

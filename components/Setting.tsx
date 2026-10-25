@@ -3,6 +3,9 @@ import { supabase } from '../supabaseClient';
 import { addLocation, deleteLocation, kickAndRemoveUser } from '../services/dataService';
 import {
   adminListUsers,
+  adminListPendingUsers,
+  adminApproveUser,
+  adminRejectUser,
   adminListResetRequests,
   adminResolveReset,
   adminSetPassword,
@@ -25,7 +28,10 @@ import {
   CheckCircle,
   AlertTriangle,
   UserCheck,
-  UserX
+  UserX,
+  UserPlus,
+  Check,
+  XCircle
 } from 'lucide-react';
 
 interface Props {
@@ -40,6 +46,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
   const [newLocation, setNewLocation] = useState('');
   const [onlineSessions, setOnlineSessions] = useState<any[]>([]);
   const [appUsers, setAppUsers] = useState<AuthUser[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<AuthUser[]>([]);
   const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,12 +54,12 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
   // Password reset inline state
   const [selectedUserForReset, setSelectedUserForReset] = useState<string | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'users' | 'resets' | 'locations'>('users');
+  const [activeTab, setActiveTab] = useState<'approvals' | 'users' | 'resets' | 'locations'>('users');
 
   useEffect(() => {
     fetchData();
 
-    // Listen for realtime events (e.g. new reset requests or users)
+    // Listen for realtime events
     const sub = supabase.channel('settings-realtime-view')
       .on('postgres_changes', { event: '*', table: 'users_online', schema: 'public' }, () => {
         fetchOnlineSessions();
@@ -61,6 +68,12 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
         fetchData();
       })
       .on('broadcast', { event: 'USER_REGISTERED' }, () => {
+        fetchData();
+      })
+      .on('broadcast', { event: 'USER_APPROVED' }, () => {
+        fetchData();
+      })
+      .on('broadcast', { event: 'USER_REJECTED' }, () => {
         fetchData();
       })
       .subscribe();
@@ -86,14 +99,37 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
 
   const fetchAppUsersAndResets = async () => {
     try {
-      const [users, requests] = await Promise.all([
+      const [users, pending, requests] = await Promise.all([
         adminListUsers(),
+        adminListPendingUsers(),
         adminListResetRequests()
       ]);
       setAppUsers(users);
+      setPendingUsers(pending);
       setResetRequests(requests);
     } catch (err) {
       console.error('Failed to load users/requests:', err);
+    }
+  };
+
+  const handleApproveUser = async (username: string) => {
+    try {
+      await adminApproveUser(username);
+      alert(`User "${username}" approved successfully. They can now log in.`);
+      fetchAppUsersAndResets();
+    } catch (e: any) {
+      alert('Failed to approve user: ' + (e.message || 'Error'));
+    }
+  };
+
+  const handleRejectUser = async (username: string) => {
+    if (!confirm(`Are you sure you want to REJECT and block registration for "${username}"?`)) return;
+    try {
+      await adminRejectUser(username);
+      alert(`Registration for "${username}" rejected.`);
+      fetchAppUsersAndResets();
+    } catch (e: any) {
+      alert('Failed to reject user: ' + (e.message || 'Error'));
     }
   };
 
@@ -203,9 +239,30 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn pb-12">
+      {/* Alert for Pending Registrations */}
+      {role === UserRole.ADMIN && pendingUsers.length > 0 && (
+        <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <UserPlus className="text-blue-600 shrink-0" size={24} />
+            <div>
+              <h4 className="font-bold text-blue-900 text-sm">
+                {pendingUsers.length} Pending Account Registration{pendingUsers.length > 1 ? 's' : ''}
+              </h4>
+              <p className="text-xs text-blue-700">New internal users have registered and are waiting for your approval before logging in.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('approvals')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow"
+          >
+            Review Approvals
+          </button>
+        </div>
+      )}
+
       {/* Alert for Pending Password Resets */}
       {role === UserRole.ADMIN && pendingResets.length > 0 && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-pulse">
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <AlertTriangle className="text-amber-600 shrink-0" size={24} />
             <div>
@@ -224,13 +281,27 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
         {role === UserRole.ADMIN && (
           <>
             <button
+              onClick={() => setActiveTab('approvals')}
+              className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 relative shrink-0 ${
+                activeTab === 'approvals' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <UserPlus size={16} /> Pending Approvals
+              {pendingUsers.length > 0 && (
+                <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {pendingUsers.length}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => setActiveTab('users')}
-              className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 shrink-0 ${
                 activeTab === 'users' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
@@ -239,7 +310,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
 
             <button
               onClick={() => setActiveTab('resets')}
-              className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 relative ${
+              className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 relative shrink-0 ${
                 activeTab === 'resets' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
@@ -255,7 +326,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
 
         <button
           onClick={() => setActiveTab('locations')}
-          className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 shrink-0 ${
             activeTab === 'locations' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
           }`}
         >
@@ -273,7 +344,76 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
         </button>
       </div>
 
-      {/* TAB 1: USER ACCOUNTS (ADMIN ONLY) */}
+      {/* TAB: PENDING APPROVALS (ADMIN ONLY) */}
+      {role === UserRole.ADMIN && activeTab === 'approvals' && (
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <UserPlus className="text-blue-600" size={20} /> Pending User Approvals
+              </h2>
+              <p className="text-xs text-gray-400">
+                Only approved users are granted access to log into the GRP Slab Opname system.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border border-gray-100 rounded-xl">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="px-6 py-3">Username</th>
+                  <th className="px-6 py-3">Full Name</th>
+                  <th className="px-6 py-3">Registered At</th>
+                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pendingUsers.map(u => (
+                  <tr key={u.id} className="hover:bg-blue-50/30">
+                    <td className="px-6 py-4 font-bold text-gray-800">{u.username}</td>
+                    <td className="px-6 py-4 text-gray-600">{u.full_name}</td>
+                    <td className="px-6 py-4 text-xs text-gray-400">
+                      {u.created_at ? new Date(u.created_at).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-bold">
+                        Pending Approval
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleApproveUser(u.username)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow transition-all flex items-center gap-1 active:scale-95"
+                        >
+                          <Check size={14} /> Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectUser(u.username)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95"
+                        >
+                          <XCircle size={14} /> Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {pendingUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-10 text-center text-gray-400 italic">
+                      No pending user registrations. All users are reviewed!
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: USER ACCOUNTS (ADMIN ONLY) */}
       {role === UserRole.ADMIN && activeTab === 'users' && (
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
@@ -331,13 +471,17 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                           onClick={() => !isMasterAdmin && handleToggleStatus(u)}
                           disabled={isMasterAdmin}
                           className={`text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1.5 ${
-                            u.is_active !== false
+                            u.is_active !== false && u.status === 'approved'
                               ? 'text-emerald-700 bg-emerald-50'
                               : 'text-rose-700 bg-rose-50'
                           } ${!isMasterAdmin ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'}`}
                         >
-                          {u.is_active !== false ? <UserCheck size={14} /> : <UserX size={14} />}
-                          {u.is_active !== false ? 'Active' : 'Disabled'}
+                          {u.is_active !== false && u.status === 'approved' ? <UserCheck size={14} /> : <UserX size={14} />}
+                          {u.status === 'pending_approval'
+                            ? 'Pending'
+                            : u.is_active !== false
+                            ? 'Active'
+                            : 'Disabled'}
                         </button>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -449,7 +593,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
         </div>
       )}
 
-      {/* TAB 2: PASSWORD RESET REQUESTS (ADMIN ONLY) */}
+      {/* TAB: PASSWORD RESET REQUESTS (ADMIN ONLY) */}
       {role === UserRole.ADMIN && activeTab === 'resets' && (
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
           <div>
@@ -521,7 +665,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
         </div>
       )}
 
-      {/* TAB 3: LOCATIONS */}
+      {/* TAB: LOCATIONS */}
       {activeTab === 'locations' && (
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
