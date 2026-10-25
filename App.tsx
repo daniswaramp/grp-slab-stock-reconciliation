@@ -67,6 +67,10 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogout = useCallback(() => {
+    const rawUsername = localStorage.getItem('slab_opname_username') || userName;
+    if (rawUsername) {
+      supabase.from('users_online').delete().ilike('name', `%${rawUsername}%`);
+    }
     logoutUser();
     setUserName(null);
     setAuthUsername('');
@@ -76,7 +80,7 @@ const App: React.FC = () => {
     setAuthError(null);
     setAuthSuccess(null);
     sessionStorage.removeItem('hasSeenNotification');
-  }, []);
+  }, [userName]);
 
   // Real-time listeners & Notification
   useEffect(() => {
@@ -152,7 +156,7 @@ const App: React.FC = () => {
     if (userName && isDbReady) {
       updateUserStatus(userName, true); // Initial login = true
       fetchInitialData();
-      const interval = setInterval(() => updateUserStatus(userName, false), 60000); // Heartbeat = false
+      const interval = setInterval(() => updateUserStatus(userName, false), 30000); // Heartbeat = 30s
       return () => clearInterval(interval);
     }
   }, [userName, isDbReady]);

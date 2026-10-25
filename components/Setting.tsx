@@ -11,6 +11,7 @@ import {
   adminSetPassword,
   adminToggleUserStatus,
   adminToggleUserRole,
+  adminDeleteUser,
   AuthUser,
   PasswordResetRequest
 } from '../services/authService';
@@ -76,6 +77,9 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
       .on('broadcast', { event: 'USER_REJECTED' }, () => {
         fetchData();
       })
+      .on('broadcast', { event: 'USER_DELETED' }, () => {
+        fetchData();
+      })
       .subscribe();
 
     return () => {
@@ -133,6 +137,25 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
     }
   };
 
+  const handleDeleteUser = async (username: string) => {
+    if (username.toLowerCase() === 'admin' || username.toLowerCase() === currentUserName.toLowerCase()) {
+      alert('Cannot delete the primary administrator or your own account.');
+      return;
+    }
+
+    if (!confirm(`DANGER: Are you sure you want to PERMANENTLY delete user account "${username}"?\n\nThis will remove their login and terminate any active sessions immediately.`)) {
+      return;
+    }
+
+    try {
+      await adminDeleteUser(username);
+      alert(`User account "${username}" has been permanently deleted.`);
+      fetchAppUsersAndResets();
+    } catch (e: any) {
+      alert('Failed to delete user: ' + (e.message || 'Unknown error'));
+    }
+  };
+
   const handleAddLocation = async () => {
     const trimmed = newLocation.trim();
     if (!trimmed) return;
@@ -163,7 +186,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
   };
 
   const handleKickSession = async (name: string) => {
-    if (name.toLowerCase() === 'admin' || name === currentUserName) {
+    if (name.toLowerCase().includes('admin') || name.toLowerCase().includes(currentUserName.toLowerCase())) {
       alert('Cannot disconnect your own session.');
       return;
     }
@@ -396,6 +419,13 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                         >
                           <XCircle size={14} /> Reject
                         </button>
+                        <button
+                          onClick={() => handleDeleteUser(u.username)}
+                          className="bg-gray-100 hover:bg-rose-50 hover:text-rose-600 text-gray-500 font-bold text-xs px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95"
+                          title="Delete Registration Request"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -485,15 +515,26 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                         </button>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => {
-                            setSelectedUserForReset(u.username);
-                            setNewPasswordInput('');
-                          }}
-                          className="text-xs bg-gray-100 hover:bg-blue-50 hover:text-blue-600 font-bold px-3 py-1.5 rounded-lg transition-all"
-                        >
-                          Reset Password
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedUserForReset(u.username);
+                              setNewPasswordInput('');
+                            }}
+                            className="text-xs bg-gray-100 hover:bg-blue-50 hover:text-blue-600 font-bold px-3 py-1.5 rounded-lg transition-all"
+                          >
+                            Reset Password
+                          </button>
+                          {!isMasterAdmin && !isCurrent && (
+                            <button
+                              onClick={() => handleDeleteUser(u.username)}
+                              className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 shadow-sm border border-rose-200 active:scale-95"
+                              title="Permanently Delete User Account"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -558,7 +599,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {onlineSessions.map(s => {
-                    const isProtected = s.name.toLowerCase() === 'admin' || s.name === currentUserName;
+                    const isProtected = s.name.toLowerCase().includes('admin') || s.name.toLowerCase().includes(currentUserName.toLowerCase());
                     return (
                       <tr key={s.name} className="hover:bg-gray-50">
                         <td className="px-6 py-3 font-semibold text-gray-700">{s.name}</td>

@@ -67,6 +67,13 @@ export default async function handler(req: any, res: any) {
 
     // 1. SELECT
     if (action === 'select') {
+      // Opportunistic cleanup of dead sessions older than 15 minutes
+      if (table === 'users_online') {
+        try {
+          await (db as any)("DELETE FROM \"users_online\" WHERE last_seen < NOW() - INTERVAL '15 minutes';");
+        } catch (e) {}
+      }
+
       const params: any[] = [];
       let whereClause = '';
 
@@ -198,6 +205,18 @@ export default async function handler(req: any, res: any) {
       const query = `INSERT INTO ${safeTable} (${safeCols}) VALUES ${rowClauses.join(', ')} ON CONFLICT (${safeConflict}) ${conflictAction} ${returningClause};`;
       const result = await (db as any)(query, params);
 
+      // Log event for realtime sync
+      try {
+        if (table === 'users_online') {
+          await (db as any)(
+            `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
+            ['USERS_ONLINE_UPDATE', JSON.stringify(items[0])]
+          );
+        }
+      } catch (e) {
+        console.error('Failed to log event on upsert:', e);
+      }
+
       return res.status(200).json({ data: result || [] });
     }
 
@@ -229,8 +248,10 @@ export default async function handler(req: any, res: any) {
 
       // Log event
       try {
-        if (table === 'system_settings' || table === 'opname_records') {
-          const eventType = table === 'system_settings' ? 'SETTINGS_UPDATE' : 'OPNAME_UPDATE';
+        if (table === 'system_settings' || table === 'opname_records' || table === 'users_online') {
+          const eventType = table === 'system_settings'
+            ? 'SETTINGS_UPDATE'
+            : (table === 'users_online' ? 'USERS_ONLINE_UPDATE' : 'OPNAME_UPDATE');
           await (db as any)(
             `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
             [eventType, JSON.stringify(result?.[0] || values)]

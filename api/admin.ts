@@ -239,20 +239,53 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true });
     }
 
-    // 10. DELETE USER
+    // 10. DELETE USER ACCOUNT (ADMIN PRIVILEGE)
     if (action === 'delete_user_account') {
       const { username } = req.body;
+
+      if (!username) {
+        return res.status(400).json({ error: 'Username is required.' });
+      }
 
       if (username.toLowerCase() === 'admin') {
         return res.status(400).json({ error: 'Cannot delete the primary administrator account.' });
       }
 
-      await (db as any)(
-        'DELETE FROM "app_users" WHERE LOWER(username) = LOWER($1);',
+      // 1. Delete user from app_users
+      const delRows = await (db as any)(
+        'DELETE FROM "app_users" WHERE LOWER(username) = LOWER($1) RETURNING id, username;',
         [username]
       );
 
-      return res.status(200).json({ success: true });
+      if (!delRows || delRows.length === 0) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      // 2. Delete any pending or historic reset requests
+      await (db as any)(
+        'DELETE FROM "password_reset_requests" WHERE LOWER(username) = LOWER($1);',
+        [username]
+      );
+
+      // 3. Remove active sessions from users_online
+      await (db as any)(
+        "DELETE FROM \"users_online\" WHERE LOWER(name) LIKE '%' || LOWER($1) || '%';",
+        [username]
+      );
+
+      // 4. Broadcast KICK_USER to terminate active session immediately
+      try {
+        await (db as any)(
+          `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
+          ['KICK_USER', JSON.stringify({ name: username })]
+        );
+        await (db as any)(
+          `INSERT INTO "system_events" (event_type, payload) VALUES ($1, $2);`,
+          ['USER_DELETED', JSON.stringify({ username, deleted_by: authUser.username })]
+        );
+      } catch (e) {}
+
+      return res.status(200).json({ success: true, message: `Account ${username} has been permanently deleted.` });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

@@ -52,7 +52,12 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users_online' }, () => fetchData(true))
       .subscribe();
 
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 15000);
+
     return () => {
+      clearInterval(interval);
       supabase.removeChannel(recordsSub);
     };
   }, []);
@@ -203,14 +208,19 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 group">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
               <Users size={24} strokeWidth={2.5} />
             </div>
-            <span className="px-2.5 py-1 bg-gray-50 text-gray-400 text-[10px] font-bold uppercase tracking-wider rounded-md">Total</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider rounded-md border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live
+            </span>
           </div>
           <div>
-            <p className="text-3xl font-black text-gray-900 mb-1">{usersOnline.length}</p>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Registered Users</p>
+            <p className="text-3xl font-black text-gray-900 mb-1">
+              {usersOnline.filter(u => getUserStatus(u.last_seen)).length}
+            </p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Active Online Users</p>
           </div>
         </div>
 

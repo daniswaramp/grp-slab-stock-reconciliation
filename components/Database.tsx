@@ -100,7 +100,7 @@ const Database: React.FC<Props> = ({ role, isLocked = false, userName = '' }) =>
         <table className="w-full text-left text-[11px] whitespace-nowrap">
           <thead className="bg-gray-50 text-gray-600 uppercase text-[9px] font-bold sticky top-0"><tr><th className="px-4 py-3">Batch ID</th><th className="px-4 py-3">Weight (MT)</th><th className="px-4 py-3">Dimensions</th></tr></thead>
           <tbody className="divide-y divide-gray-50">
-            {items.map((item, idx) => (<tr key={idx} className="hover:bg-blue-50 transition-colors"><td className="px-4 py-3 font-bold text-gray-900">{item.batch_id}</td><td className="px-4 py-3 text-gray-800 font-mono">{item.slab_weight.toFixed(3)}</td><td className="px-4 py-3 text-gray-700">{item.thickness}x{item.width}x{item.length}</td></tr>))}
+            {items.map((item, idx) => (<tr key={idx} className="hover:bg-blue-50 transition-colors"><td className="px-4 py-3 font-bold text-gray-900">{item.batch_id}</td><td className="px-4 py-3 text-gray-800 font-mono">{(Number(item.slab_weight) || 0).toFixed(3)}</td><td className="px-4 py-3 text-gray-700">{item.thickness}x{item.width}x{item.length}</td></tr>))}
             {items.length === 0 && (<tr><td colSpan={3} className="px-4 py-10 text-center text-gray-400 italic">No records in this dataset</td></tr>)}
           </tbody>
         </table>
