@@ -24,7 +24,7 @@ export default async function handler(req: any, res: any) {
       const sinceId = parseInt(req.query.since_id as string, 10) || 0;
 
       const events = await (db as any)(
-        'SELECT id, event_type, payload, created_at FROM "system_events" WHERE id > $1 ORDER BY id ASC LIMIT 50;',
+        'SELECT id::int, event_type, payload, created_at FROM "system_events" WHERE id > $1 ORDER BY id ASC LIMIT 50;',
         [sinceId]
       );
 

@@ -130,8 +130,9 @@ class RealtimeManager {
 
       if (Array.isArray(events) && events.length > 0) {
         for (const evt of events) {
-          if (evt.id > this.lastEventId) {
-            this.lastEventId = evt.id;
+          const numId = Number(evt.id);
+          if (!isNaN(numId) && numId > this.lastEventId) {
+            this.lastEventId = numId;
           }
           this.dispatchEvent(evt);
         }

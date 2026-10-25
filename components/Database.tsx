@@ -5,6 +5,7 @@ import { SlabRecord, UserRole } from '../types';
 import { Database as DbIcon, RefreshCcw, FileUp, AlertCircle, Trash2, Save, FolderOpen, Loader2 } from 'lucide-react';
 import BackupModal from './BackupModal';
 import BackupList from './BackupList';
+import { useI18n } from '../i18n';
 
 interface Props {
   role: UserRole;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 const Database: React.FC<Props> = ({ role, isLocked = false, userName = '' }) => {
+  const { t } = useI18n();
   const [data, setData] = useState<{ sap: any[], mother: any[], cut: any[] }>({ sap: [], mother: [], cut: [] });
   const [counts, setCounts] = useState({ sap: 0, mother: 0, cut: 0 });
   const [loading, setLoading] = useState(false);
@@ -113,7 +115,7 @@ const Database: React.FC<Props> = ({ role, isLocked = false, userName = '' }) =>
   return (
     <div className="space-y-6 animate-fadeIn h-full flex flex-col">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><DbIcon className="text-blue-600" size={24} /> Master Database Summary</h2><p className="text-sm text-gray-500">Preview latest 10 rows and datasets status</p></div>
+        <div><h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><DbIcon className="text-blue-600" size={24} /> {t.database.title}</h2><p className="text-sm text-gray-500">{t.database.subtitle}</p></div>
         <div className="flex gap-2">
           <button onClick={() => setActiveSection('stock')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSection === 'stock' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Stock Data</button>
           {role === UserRole.ADMIN && (<button onClick={() => setActiveSection('backup')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSection === 'backup' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Backup & Clear</button>)}

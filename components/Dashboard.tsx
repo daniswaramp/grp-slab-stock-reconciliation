@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { Users, ClipboardCheck, AlertTriangle, XCircle, Circle, Activity, LayoutGrid, Bell, X, Edit, Save } from 'lucide-react';
+import { Users, ClipboardCheck, AlertTriangle, XCircle, Circle, Activity, LayoutGrid, Bell, X, Edit, Save, RefreshCw } from 'lucide-react';
 import { getUnopnamedCounts, updateSystemNotification, fetchAllOpnameRecords, updateOpnameCacheFromPayload } from '../services/dataService';
 import { UserRole } from '../types';
+import { useI18n } from '../i18n';
 
 interface Props {
   userName?: string;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
+  const { t } = useI18n();
   const [usersOnline, setUsersOnline] = useState<any[]>([]);
   const [opnameStats, setOpnameStats] = useState<any[]>([]);
   const [locationStats, setLocationStats] = useState<any[]>([]);
@@ -136,9 +138,27 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
   };
 
   const getUserStatus = (lastSeen: string) => {
-    const lastSeenDate = new Date(lastSeen).getTime();
-    const now = new Date().getTime();
-    return now - lastSeenDate < 5 * 60 * 1000;
+    if (!lastSeen) return false;
+    const diff = Math.abs(Date.now() - new Date(lastSeen).getTime());
+    return diff < 5 * 60 * 1000;
+  };
+
+  const parseUserDisplay = (rawName: string) => {
+    const match = (rawName || '').match(/^(.*?)(?:\s*\((.*?)\))?$/);
+    return {
+      displayName: match?.[1]?.trim() || rawName || 'Unknown',
+      username: match?.[2]?.trim() || null
+    };
+  };
+
+  const formatLastSeen = (lastSeen: string) => {
+    if (!lastSeen) return '-';
+    const diffSec = Math.floor(Math.abs(Date.now() - new Date(lastSeen).getTime()) / 1000);
+    if (diffSec < 15) return 'Just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    return new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const handleSaveNotification = async () => {
@@ -181,8 +201,8 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
     <div className="space-y-8 animate-fadeIn pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard Overview</h2>
-          <p className="text-sm text-gray-500 font-medium">Real-time monitoring of reconciliation progress</p>
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">{t.dashboard.title}</h2>
+          <p className="text-sm text-gray-500 font-medium">{t.dashboard.subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
           {(notification || role === UserRole.ADMIN) && (
@@ -195,12 +215,12 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
                 }`}
              >
                 <Bell size={14} className={notification ? 'fill-yellow-500' : ''} />
-                {notification ? 'Announcement' : 'Set Announcement'}
+                {notification ? t.dashboard.announcement : t.dashboard.setAnnouncement}
              </button>
           )}
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100">
             <Activity size={14} className="animate-pulse" />
-            Live Updates Active
+            {t.dashboard.liveUpdates}
           </div>
         </div>
       </div>
@@ -220,7 +240,7 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
             <p className="text-3xl font-black text-gray-900 mb-1">
               {usersOnline.filter(u => getUserStatus(u.last_seen)).length}
             </p>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Active Online Users</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.dashboard.activeOnlineUsers}</p>
           </div>
         </div>
 
@@ -245,48 +265,70 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
-            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
-              <Circle size={16} className="fill-current" />
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <Circle size={16} className="fill-current" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">{t.dashboard.userActivityTitle}</h3>
+                <p className="text-xs text-gray-500">{t.dashboard.userActivitySubtitle}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-gray-900">User Activity Status</h3>
-              <p className="text-xs text-gray-500">Live monitoring of connected inspectors</p>
-            </div>
+            <button
+              onClick={() => fetchData(true)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-white transition-all shadow-sm border border-transparent hover:border-gray-200"
+              title="Refresh User List"
+            >
+              <RefreshCw size={14} />
+            </button>
           </div>
           <div className="overflow-auto flex-1 max-h-[400px]">
             <table className="w-full text-left text-sm">
               <thead className="bg-white sticky top-0 z-10 border-b border-gray-100">
                 <tr className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                   <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm w-16">#</th>
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm">Inspector Name</th>
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm">Last Seen</th>
-                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm text-right">Status</th>
+                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm">{t.dashboard.inspectorName}</th>
+                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm">{t.dashboard.lastSeen}</th>
+                  <th className="px-6 py-4 bg-gray-50/80 backdrop-blur-sm text-right">{t.dashboard.status}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {usersOnline.map((user, idx) => {
                   const isActive = getUserStatus(user.last_seen);
+                  const { displayName, username } = parseUserDisplay(user.name);
                   return (
                     <tr key={user.name} className="hover:bg-blue-50/30 transition-colors group">
                       <td className="px-6 py-4 text-gray-400 font-medium">{idx + 1}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                            {user.name.charAt(0).toUpperCase()}
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                            isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {displayName.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-bold text-gray-700">{user.name}</span>
+                          <div>
+                            <span className="font-bold text-gray-800 text-sm">{displayName}</span>
+                            {username && (
+                              <span className="ml-2 text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                @{username}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-gray-500 font-mono">
-                        {new Date(user.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <td className="px-6 py-4 text-xs font-mono">
+                        <span className="text-gray-700 font-semibold">{formatLastSeen(user.last_seen)}</span>
+                        <span className="text-gray-400 text-[10px] ml-1.5">
+                          ({new Date(user.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                          isActive ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'
+                          isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-400 border border-gray-200'
                         }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-                          {isActive ? 'Active' : 'Offline'}
+                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                          {isActive ? t.dashboard.active : t.dashboard.offline}
                         </span>
                       </td>
                     </tr>
@@ -295,7 +337,7 @@ const Dashboard: React.FC<Props> = ({ userName, role, notification }) => {
                 {usersOnline.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-6 py-12 text-center text-gray-400 italic text-xs">
-                      No users currently online
+                      {t.dashboard.noUsersOnline}
                     </td>
                   </tr>
                 )}

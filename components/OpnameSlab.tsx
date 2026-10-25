@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { searchSlab, saveOpnameRecord, uploadEvidenceImage } from '../services/dataService';
 import { SlabRecord, OpnameRecord, Location } from '../types';
 import { Check, Search, Save, X, ClipboardCheck, MousePointer2, Filter, Camera, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface Props {
   userName: string;
@@ -28,6 +29,7 @@ const OpnameSlab: React.FC<Props> = ({
   setLastManualInput,
   isLocked = false
 }) => {
+  const { t } = useI18n();
   const [results, setResults] = useState<{ sap: SlabRecord[], mother: SlabRecord[], cut: SlabRecord[], opname: any[] }>({ sap: [], mother: [], cut: [], opname: [] });
   const [showPopup, setShowPopup] = useState<'Synchronized' | 'Missing Data' | 'Not Available' | null>(null);
   const [hideZero, setHideZero] = useState({ sap: false, mother: false, cut: false });
@@ -76,7 +78,6 @@ const OpnameSlab: React.FC<Props> = ({
   const currentSearchTerm = selectedBatchId || searchInput;
   const showDuplicateWarning = currentSearchTerm && currentSearchTerm.length >= 5;
   const duplicateMatch = showDuplicateWarning ? results.opname.find(r => r.batch_id === currentSearchTerm) : null;
-  const fuzzyMatch = (showDuplicateWarning && !duplicateMatch && results.opname.length > 0) ? results.opname[0] : null;
 
   const allBatchIds = Array.from(new Set([
     ...currentSap.map(r => r.batch_id),
@@ -249,7 +250,7 @@ const OpnameSlab: React.FC<Props> = ({
       <div className="bg-white p-4 md:p-10 rounded-3xl border border-gray-100 shadow-sm">
         <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
           <div className="p-2 bg-blue-600 rounded-lg text-white"><Search size={20} /></div>
-          Scan or Enter Slab Code
+          {t.opnameSlab.title}
         </h2>
         
         <div className="relative mb-6 md:mb-10 group">
@@ -258,28 +259,41 @@ const OpnameSlab: React.FC<Props> = ({
             type="text" 
             value={searchInput}
             onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="Enter slab / batch ID to search..."
+            placeholder={t.opnameSlab.searchPlaceholder}
             className="w-full text-base md:text-xl border border-gray-200 rounded-xl pl-14 pr-6 py-3 md:py-4 outline-none transition-all placeholder:text-gray-400 text-black bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
           />
           {selectedBatchId && (
             <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-blue-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg animate-fadeIn">
-              <MousePointer2 size={12}/> ACTIVE SELECTION: {selectedBatchId}
+              <MousePointer2 size={12}/> {t.opnameSlab.activeSelection}: {selectedBatchId}
               <button onClick={() => handleSelectBatch(selectedBatchId)} className="ml-2 hover:text-red-300"><X size={14}/></button>
             </div>
           )}
         </div>
 
-        {(duplicateMatch || fuzzyMatch) && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl animate-fadeIn">
-            <div className="flex items-center gap-2 text-red-700 font-bold text-sm">
-              <AlertTriangle size={18} />
-              {duplicateMatch ? `Perhatian: Batch ID "${duplicateMatch.batch_id}" sudah diopname!` : `Apakah maksud anda "${fuzzyMatch.batch_id}"?`}
+        {duplicateMatch && (
+          <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-2xl animate-fadeIn shadow-sm">
+            <div className="flex items-start gap-3 text-amber-900 text-sm">
+              <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-950">
+                  {t.opnameSlab.duplicateWarning} (Batch: <span className="font-mono underline">{duplicateMatch.batch_id}</span>)
+                </p>
+                <p className="text-xs text-amber-800 mt-1 font-medium">
+                  {t.opnameSlab.duplicateDetails(
+                    duplicateMatch.user_name || 'Inspector',
+                    duplicateMatch.date || '-',
+                    duplicateMatch.time || '-',
+                    duplicateMatch.status || '-',
+                    duplicateMatch.location || '-'
+                  )}
+                </p>
+              </div>
             </div>
           </div>
         )}
 
         <div className="grid grid-cols-3 gap-2 md:gap-6 mb-6 md:mb-10">
-          {[{ label: 'SAP Record', exists: sapExists }, { label: 'Mother Slab', exists: motherExists }, { label: 'Cut Stock', exists: cutExists }].map(item => (
+          {[{ label: t.opnameSlab.sapRecord, exists: sapExists }, { label: t.opnameSlab.motherSlab, exists: motherExists }, { label: t.opnameSlab.cutStock, exists: cutExists }].map(item => (
             <div key={item.label} className={`p-3 md:p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${item.exists ? 'bg-green-50 border-green-200 text-green-900 scale-105 shadow-md shadow-green-100' : 'bg-gray-50 border-gray-100 text-gray-400'}`}>
               <span className="text-[10px] uppercase font-bold tracking-widest text-center leading-tight">{item.label}</span>
               {item.exists ? <Check size={28} className="text-green-600" strokeWidth={3} /> : <div className="h-7 w-7 rounded-full border-2 border-dashed border-gray-200"></div>}
@@ -288,16 +302,16 @@ const OpnameSlab: React.FC<Props> = ({
         </div>
 
         <div className="grid grid-cols-3 gap-2 md:gap-6">
-          <button disabled={!canSync || isLocked} onClick={() => handleAction('Synchronized')} className={`py-3 md:py-6 rounded-2xl font-black text-[10px] md:text-sm shadow-xl transition-all active:scale-95 ${canSync && !isLocked ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}>SYNCHRONIZE</button>
-          <button disabled={!canMissing || isLocked} onClick={() => handleAction('Missing Data')} className={`py-3 md:py-6 rounded-2xl font-black text-[10px] md:text-sm shadow-xl transition-all active:scale-95 ${canMissing && !isLocked ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}>MISSING DATA</button>
-          <button disabled={!canNotAvailable || isLocked} onClick={() => handleAction('Not Available')} className={`py-3 md:py-6 rounded-2xl font-black text-[10px] md:text-sm shadow-xl transition-all active:scale-95 ${canNotAvailable && !isLocked ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}>NOT AVAILABLE</button>
+          <button disabled={!canSync || isLocked} onClick={() => handleAction('Synchronized')} className={`py-3 md:py-6 rounded-2xl font-black text-[10px] md:text-sm shadow-xl transition-all active:scale-95 ${canSync && !isLocked ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}>{t.opnameSlab.synchronize}</button>
+          <button disabled={!canMissing || isLocked} onClick={() => handleAction('Missing Data')} className={`py-3 md:py-6 rounded-2xl font-black text-[10px] md:text-sm shadow-xl transition-all active:scale-95 ${canMissing && !isLocked ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}>{t.opnameSlab.missingData}</button>
+          <button disabled={!canNotAvailable || isLocked} onClick={() => handleAction('Not Available')} className={`py-3 md:py-6 rounded-2xl font-black text-[10px] md:text-sm shadow-xl transition-all active:scale-95 ${canNotAvailable && !isLocked ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}>{t.opnameSlab.notAvailable}</button>
         </div>
       </div>
 
       {(searchInput || lastManualInput) && (
         <div className="bg-white rounded-3xl border border-gray-200 shadow-xl overflow-hidden animate-slideUp">
           <div className="p-5 bg-white border-b border-gray-100 flex flex-col md:flex-row justify-between items-center text-gray-900 gap-4">
-            <h3 className="font-bold flex items-center gap-3"><Filter size={20} className="text-blue-600"/> Reconciliation Matrix</h3>
+            <h3 className="font-bold flex items-center gap-3"><Filter size={20} className="text-blue-600"/> {t.opnameSlab.matrixTitle}</h3>
             <div className="flex flex-wrap justify-center gap-6 text-[10px] font-bold uppercase tracking-widest">
               <label className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"><input type="checkbox" checked={hideZero.sap} onChange={e => setHideZero({...hideZero, sap: e.target.checked})} className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600" /> Hide 0 MT SAP</label>
               <label className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"><input type="checkbox" checked={hideZero.mother} onChange={e => setHideZero({...hideZero, mother: e.target.checked})} className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600" /> Hide 0 MT MOTHER</label>

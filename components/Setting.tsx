@@ -34,6 +34,7 @@ import {
   Check,
   XCircle
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface Props {
   role: UserRole;
@@ -44,6 +45,7 @@ interface Props {
 }
 
 const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh, isLocked = false }) => {
+  const { t } = useI18n();
   const [newLocation, setNewLocation] = useState('');
   const [onlineSessions, setOnlineSessions] = useState<any[]>([]);
   const [appUsers, setAppUsers] = useState<AuthUser[]>([]);
@@ -82,7 +84,12 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
       })
       .subscribe();
 
+    const interval = setInterval(() => {
+      fetchOnlineSessions();
+    }, 10000);
+
     return () => {
+      clearInterval(interval);
       supabase.removeChannel(sub);
     };
   }, []);
@@ -99,6 +106,43 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
   const fetchOnlineSessions = async () => {
     const { data } = await supabase.from('users_online').select('*').order('last_seen', { ascending: false });
     setOnlineSessions(data || []);
+  };
+
+  const isSessionActive = (lastSeen: string) => {
+    if (!lastSeen) return false;
+    const diff = Math.abs(Date.now() - new Date(lastSeen).getTime());
+    return diff < 5 * 60 * 1000;
+  };
+
+  const isUserOnline = (username: string) => {
+    const session = onlineSessions.find(s => {
+      const raw = (s.name || '').toLowerCase();
+      const target = (username || '').toLowerCase();
+      return (
+        raw.includes(`(${target})`) ||
+        raw === target ||
+        raw.startsWith(`${target} `)
+      );
+    });
+    return session ? isSessionActive(session.last_seen) : false;
+  };
+
+  const parseSessionName = (rawName: string) => {
+    const match = (rawName || '').match(/^(.*?)(?:\s*\((.*?)\))?$/);
+    return {
+      displayName: match?.[1]?.trim() || rawName || 'Unknown',
+      username: match?.[2]?.trim() || null
+    };
+  };
+
+  const formatRelativeTime = (lastSeen: string) => {
+    if (!lastSeen) return '-';
+    const diffSec = Math.floor(Math.abs(Date.now() - new Date(lastSeen).getTime()) / 1000);
+    if (diffSec < 15) return 'Just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    return new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const fetchAppUsersAndResets = async () => {
@@ -314,7 +358,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                 activeTab === 'approvals' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              <UserPlus size={16} /> Pending Approvals
+              <UserPlus size={16} /> {t.setting.pendingTab}
               {pendingUsers.length > 0 && (
                 <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
                   {pendingUsers.length}
@@ -328,7 +372,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                 activeTab === 'users' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              <Users size={16} /> User Accounts ({appUsers.length})
+              <Users size={16} /> {t.setting.usersTab} ({appUsers.length})
             </button>
 
             <button
@@ -337,7 +381,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                 activeTab === 'resets' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              <KeyRound size={16} /> Password Resets
+              <KeyRound size={16} /> {t.setting.resetsTab}
               {pendingResets.length > 0 && (
                 <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
                   {pendingResets.length}
@@ -353,7 +397,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
             activeTab === 'locations' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'
           }`}
         >
-          <MapPin size={16} /> Locations ({locations.length})
+          <MapPin size={16} /> {t.setting.locationsTab} ({locations.length})
         </button>
 
         <button
@@ -462,7 +506,8 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                   <th className="px-6 py-3">Username</th>
                   <th className="px-6 py-3">Full Name</th>
                   <th className="px-6 py-3">Role</th>
-                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Presence</th>
+                  <th className="px-6 py-3">Account State</th>
                   <th className="px-6 py-3 text-center">Actions</th>
                 </tr>
               </thead>
@@ -470,6 +515,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                 {appUsers.map(u => {
                   const isCurrent = u.username.toLowerCase() === currentUserName.toLowerCase();
                   const isMasterAdmin = u.username.toLowerCase() === 'admin';
+                  const online = isUserOnline(u.username);
 
                   return (
                     <tr key={u.id} className="hover:bg-gray-50">
@@ -481,7 +527,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">{u.full_name}</td>
+                      <td className="px-6 py-4 text-gray-600 font-medium">{u.full_name}</td>
                       <td className="px-6 py-4">
                         <button
                           onClick={() => !isMasterAdmin && handleToggleRole(u)}
@@ -495,6 +541,19 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                         >
                           {u.role.toUpperCase()}
                         </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        {online ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Online Now
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-50 text-gray-400 border border-gray-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                            Offline
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <button
@@ -585,25 +644,61 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
 
           {/* Active Online Sessions Table */}
           <div className="pt-6 border-t border-gray-100">
-            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-              <Circle size={10} className="fill-green-500 text-green-500" /> Active Online Sessions
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <Circle size={10} className="fill-emerald-500 text-emerald-500" /> Active Online Sessions ({onlineSessions.filter(s => isSessionActive(s.last_seen)).length})
+              </h3>
+              <button
+                onClick={() => fetchOnlineSessions()}
+                className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <RefreshCcw size={12} /> Refresh
+              </button>
+            </div>
             <div className="overflow-x-auto border border-gray-100 rounded-xl">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[9px]">
                   <tr>
                     <th className="px-6 py-3">Logged-in User</th>
                     <th className="px-6 py-3">Last Active</th>
+                    <th className="px-6 py-3">Presence</th>
                     <th className="px-6 py-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {onlineSessions.map(s => {
                     const isProtected = s.name.toLowerCase().includes('admin') || s.name.toLowerCase().includes(currentUserName.toLowerCase());
+                    const { displayName, username } = parseSessionName(s.name);
+                    const active = isSessionActive(s.last_seen);
                     return (
                       <tr key={s.name} className="hover:bg-gray-50">
-                        <td className="px-6 py-3 font-semibold text-gray-700">{s.name}</td>
-                        <td className="px-6 py-3 text-gray-400">{new Date(s.last_seen).toLocaleString()}</td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] ${
+                              active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-800">{displayName}</p>
+                              {username && <p className="text-[10px] text-gray-400 font-mono">@{username}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <span className="font-semibold text-gray-700">{formatRelativeTime(s.last_seen)}</span>
+                          <span className="text-gray-400 text-[10px] ml-1.5">
+                            ({new Date(s.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-400 border border-gray-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`}></span>
+                            {active ? 'Active' : 'Idle'}
+                          </span>
+                        </td>
                         <td className="px-6 py-3 text-center">
                           {!isProtected ? (
                             <button
@@ -622,7 +717,7 @@ const Setting: React.FC<Props> = ({ role, locations, currentUserName, onRefresh,
                   })}
                   {onlineSessions.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-4 text-center text-gray-400 italic">
+                      <td colSpan={4} className="px-6 py-4 text-center text-gray-400 italic">
                         No active sessions
                       </td>
                     </tr>

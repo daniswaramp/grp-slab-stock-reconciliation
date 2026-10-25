@@ -12,8 +12,10 @@ import LockBanner from './components/LockBanner';
 import { Minus, Plus, Lock, Unlock, X, Info, UserPlus, LogIn, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getSystemNotification, getLockStatus, setLockMode } from './services/dataService';
 import { loginUser, registerUser, requestPasswordReset, getMe, logoutUser } from './services/authService';
+import { useI18n } from './i18n';
 
 const App: React.FC = () => {
+  const { language, setLanguage, t } = useI18n();
   const [userName, setUserName] = useState<string | null>(localStorage.getItem('slab_opname_user'));
   const [role, setRole] = useState<UserRole>((localStorage.getItem('slab_opname_role') as UserRole) || UserRole.USER);
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -43,6 +45,16 @@ const App: React.FC = () => {
   // Lock State
   const [lockStatus, setLockStatus] = useState<LockStatus>({ lock_mode: false, locked_at: null, locked_by: null });
   const [togglingLock, setTogglingLock] = useState(false);
+
+  // Global Presence State
+  const [globalOnlineUsers, setGlobalOnlineUsers] = useState<Array<{ name: string; last_seen: string }>>([]);
+  const [showOnlinePopover, setShowOnlinePopover] = useState(false);
+
+  const activeOnlineUsers = globalOnlineUsers.filter(u => {
+    if (!u.last_seen) return false;
+    const diff = Math.abs(Date.now() - new Date(u.last_seen).getTime());
+    return diff < 5 * 60 * 1000;
+  });
 
   useEffect(() => {
     checkDatabase();
@@ -132,10 +144,19 @@ const App: React.FC = () => {
       })
       .subscribe();
 
+    // 4. Global Online Users Real-time Sync
+    const usersOnlineChannel = supabase
+      .channel('app-users-online')
+      .on('postgres_changes', { event: '*', table: 'users_online', schema: 'public' }, () => {
+        fetchGlobalOnlineUsers();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(systemChannel);
       supabase.removeChannel(locationChannel);
       supabase.removeChannel(settingsChannel);
+      supabase.removeChannel(usersOnlineChannel);
     };
   }, [userName, isDbReady, handleLogout]);
 
@@ -156,10 +177,21 @@ const App: React.FC = () => {
     if (userName && isDbReady) {
       updateUserStatus(userName, true); // Initial login = true
       fetchInitialData();
-      const interval = setInterval(() => updateUserStatus(userName, false), 30000); // Heartbeat = 30s
+      fetchGlobalOnlineUsers();
+      const interval = setInterval(() => {
+        updateUserStatus(userName, false);
+        fetchGlobalOnlineUsers();
+      }, 30000); // Heartbeat = 30s
       return () => clearInterval(interval);
     }
   }, [userName, isDbReady]);
+
+  const fetchGlobalOnlineUsers = async () => {
+    try {
+      const { data } = await supabase.from('users_online').select('*').order('last_seen', { ascending: false });
+      if (data) setGlobalOnlineUsers(data);
+    } catch (e) {}
+  };
 
   const fetchInitialData = async () => {
     const { data: locs } = await supabase.from('locations').select('*').order('name');
@@ -212,8 +244,16 @@ const App: React.FC = () => {
           .select();
 
         if (!error && data && data.length === 0) {
-          alert('Session terminated by Administrator.');
-          handleLogout();
+          // Re-upsert if session row was opportunistically cleaned up
+          await supabase.from('users_online').upsert(
+            [
+              {
+                name: sessionKey,
+                last_seen: new Date().toISOString()
+              }
+            ],
+            { conflictCol: 'name' }
+          );
         }
       }
     } catch (e) {
@@ -613,13 +653,39 @@ const App: React.FC = () => {
             <div className="h-6 w-[1px] bg-gray-200 hidden xs:block"></div>
             <div className="hidden sm:block">
               <h1 className="text-xs md:text-sm font-black text-gray-900 truncate uppercase tracking-tighter">
-                PPIC Slab Stock Opname
+                {t.header.title}
               </h1>
-              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Reconciliation Portal</p>
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{t.header.subtitle}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-6 shrink-0">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* Language Switcher */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 border border-gray-200 shadow-inner">
+              <button
+                onClick={() => setLanguage('id')}
+                className={`px-2 py-1 rounded text-[10px] font-black tracking-wider transition-all ${
+                  language === 'id'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-700'
+                }`}
+                title="Bahasa Indonesia"
+              >
+                🇮🇩 ID
+              </button>
+              <button
+                onClick={() => setLanguage('en')}
+                className={`px-2 py-1 rounded text-[10px] font-black tracking-wider transition-all ${
+                  language === 'en'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-700'
+                }`}
+                title="English"
+              >
+                🇬🇧 EN
+              </button>
+            </div>
+
             <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200 p-1">
               <button
                 onClick={() => adjustScale(-0.1)}
@@ -636,6 +702,66 @@ const App: React.FC = () => {
               >
                 <Plus size={14} />
               </button>
+            </div>
+
+            {/* Real-time Online Users Badge */}
+            <div className="relative">
+              <button
+                onClick={() => setShowOnlinePopover(prev => !prev)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-full text-xs font-bold border border-emerald-200 transition-all shadow-sm active:scale-95"
+                title="View Connected Users"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="font-mono font-black">{activeOnlineUsers.length}</span>
+                <span className="hidden sm:inline text-[11px] font-bold">Online</span>
+              </button>
+
+              {showOnlinePopover && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-50 animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-50 animate-pulse"></span>
+                      Active Users ({activeOnlineUsers.length})
+                    </span>
+                    <button
+                      onClick={() => setShowOnlinePopover(false)}
+                      className="text-gray-400 hover:text-gray-600 text-xs font-bold p-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {activeOnlineUsers.map((u, i) => {
+                      const match = (u.name || '').match(/^(.*?)(?:\s*\((.*?)\))?$/);
+                      const displayName = match?.[1]?.trim() || u.name;
+                      const uname = match && match[2] ? `@${match[2]}` : '';
+                      const isMe = displayName === userName || (uname && uname === `@${localStorage.getItem('slab_opname_username')}`);
+                      return (
+                        <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-gray-50/80 hover:bg-blue-50/50 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                              {displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-800 leading-tight">
+                                {displayName}
+                                {isMe && <span className="ml-1 text-[9px] bg-blue-100 text-blue-600 px-1 py-0.2 rounded font-bold">You</span>}
+                              </p>
+                              {uname && <p className="text-[10px] text-gray-400 font-mono">{uname}</p>}
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            Active
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {activeOnlineUsers.length === 0 && (
+                      <p className="text-xs text-gray-400 italic text-center py-2">No other users online</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 md:gap-3 md:border-r md:pr-6 border-gray-100">
@@ -671,7 +797,7 @@ const App: React.FC = () => {
               onClick={handleLogout}
               className="text-[10px] md:text-xs font-black text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest"
             >
-              Sign Out
+              {t.header.signOut}
             </button>
           </div>
         </div>

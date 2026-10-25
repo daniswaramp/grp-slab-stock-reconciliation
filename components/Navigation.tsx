@@ -1,5 +1,6 @@
 import React from 'react';
 import { LayoutDashboard, Box, ListChecks, Settings, Database } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface NavigationProps {
   activeTab: string;
@@ -7,12 +8,14 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
+  const { t } = useI18n();
+
   const tabs = [
-    { name: 'Dashboard', icon: LayoutDashboard },
-    { name: 'Opname Slab', icon: Box },
-    { name: 'Opname List', icon: ListChecks },
-    { name: 'Setting', icon: Settings },
-    { name: 'Database', icon: Database },
+    { id: 'Dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
+    { id: 'Opname Slab', label: t.nav.opnameSlab, icon: Box },
+    { id: 'Opname List', label: t.nav.opnameList, icon: ListChecks },
+    { id: 'Setting', label: t.nav.setting, icon: Settings },
+    { id: 'Database', label: t.nav.database, icon: Database },
   ];
 
   return (
@@ -20,11 +23,11 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
       <div className="max-w-7xl mx-auto px-4 flex">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.name;
+          const isActive = activeTab === tab.id;
           return (
             <button
-              key={tab.name}
-              onClick={() => setActiveTab(tab.name)}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-3 px-6 py-4 text-xs font-black transition-all whitespace-nowrap border-b-4 uppercase tracking-wider ${
                 isActive 
                   ? 'border-blue-600 text-blue-600 bg-blue-50/30' 
@@ -32,7 +35,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
               }`}
             >
               <Icon size={16} />
-              {tab.name}
+              {tab.label}
             </button>
           );
         })}

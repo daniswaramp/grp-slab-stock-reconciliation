@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { OpnameRecord, UserRole, OpnameBackup } from '../types';
 import { getBackups, saveBackup, loadBackup, fetchAllOpnameRecords, updateOpnameCacheFromPayload } from '../services/dataService';
-import { Download, Trash2, Filter, FileSpreadsheet, Save, RotateCcw, Upload, ChevronDown, Database, Link, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Trash2, Filter, FileSpreadsheet, Save, RotateCcw, Upload, ChevronDown, Database, Link, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Clock } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface Props {
   role: UserRole;
@@ -18,7 +19,21 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
   const [showLoadModal, setShowLoadModal] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const { t } = useI18n();
   const [itemsPerPage, setItemsPerPage] = useState(100);
+
+  // Sorting State
+  const [sortField, setSortField] = useState<'date' | 'time'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: 'date' | 'time') => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
 
   const [filters, setFilters] = useState({
     startDate: '',
@@ -249,10 +264,33 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
     return true;
   });
 
-  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  const sortedRecords = [...filteredRecords].sort((a, b) => {
+    if (sortField === 'date') {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      if (dateA !== dateB) {
+        return sortOrder === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+      }
+      const timeA = a.time || '';
+      const timeB = b.time || '';
+      return sortOrder === 'asc' ? timeA.localeCompare(timeB) : timeB.localeCompare(timeA);
+    } else if (sortField === 'time') {
+      const timeA = a.time || '';
+      const timeB = b.time || '';
+      if (timeA !== timeB) {
+        return sortOrder === 'asc' ? timeA.localeCompare(timeB) : timeB.localeCompare(timeA);
+      }
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      return sortOrder === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    }
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sortedRecords.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredRecords.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = sortedRecords.slice(indexOfFirstItem, indexOfLastItem);
 
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -264,23 +302,62 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeIn pb-10">
       <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Opname Reconciliation History</h2>
-          <p className="text-sm text-gray-400">View and manage all reconciled slab records</p>
+          <h2 className="text-xl font-bold text-gray-800">{t.opnameList.title}</h2>
+          <p className="text-sm text-gray-400">{t.opnameList.subtitle}</p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Sort Buttons */}
+            <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg p-0.5 shadow-sm">
+              <button
+                onClick={() => handleSort('date')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  sortField === 'date'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Sort by Date (Asc/Desc)"
+              >
+                <Calendar size={13} />
+                <span>{t.opnameList.sortByDate}</span>
+                {sortField === 'date' ? (
+                  sortOrder === 'asc' ? <ArrowUp size={12} className="text-blue-600" /> : <ArrowDown size={12} className="text-blue-600" />
+                ) : (
+                  <ArrowUpDown size={12} className="text-gray-400" />
+                )}
+              </button>
+
+              <button
+                onClick={() => handleSort('time')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  sortField === 'time'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Sort by Time (Asc/Desc)"
+              >
+                <Clock size={13} />
+                <span>{t.opnameList.sortByTime}</span>
+                {sortField === 'time' ? (
+                  sortOrder === 'asc' ? <ArrowUp size={12} className="text-blue-600" /> : <ArrowDown size={12} className="text-blue-600" />
+                ) : (
+                  <ArrowUpDown size={12} className="text-gray-400" />
+                )}
+              </button>
+            </div>
+
             {role === UserRole.ADMIN && !isLocked && (
               <div className="relative">
                   <button
                       onClick={() => setShowBackupMenu(!showBackupMenu)}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all"
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all text-xs"
                   >
-                      <Database size={18} /> BACKUP / LOAD <ChevronDown size={14}/>
+                      <Database size={16} /> {t.opnameList.backup} <ChevronDown size={14}/>
                   </button>
                   {showBackupMenu && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20">
-                          <button onClick={() => handleBackupAction('load')} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"><RotateCcw size={14}/> Load Backup</button>
-                          <button onClick={() => handleBackupAction('save')} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"><Save size={14}/> Update & Save</button>
+                          <button onClick={() => handleBackupAction('load')} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"><RotateCcw size={14}/> {t.opnameList.loadBackup}</button>
+                          <button onClick={() => handleBackupAction('save')} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"><Save size={14}/> {t.opnameList.saveBackup}</button>
                           <button onClick={() => handleBackupAction('upload')} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"><Upload size={14}/> Upload CSV / JSON</button>
                           <button onClick={() => handleBackupAction('download')} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-sm font-medium"><Download size={14}/> Download JSON</button>
                       </div>
@@ -291,9 +368,9 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
 
             <button
             onClick={exportCSV}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 text-xs"
             >
-            <FileSpreadsheet size={18} /> EXPORT CSV
+            <FileSpreadsheet size={16} /> {t.opnameList.exportCsv}
             </button>
         </div>
       </div>
@@ -344,10 +421,36 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
         <table className="w-full text-left text-xs whitespace-nowrap">
           <thead className="bg-gray-100 text-gray-500 uppercase font-bold tracking-wider">
             <tr>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">User</th>
-              <th className="px-4 py-3">Time</th>
-              <th className="px-4 py-3">Batch ID</th>
+              <th
+                onClick={() => handleSort('date')}
+                className="px-4 py-3 cursor-pointer hover:bg-gray-200 transition-colors select-none group"
+                title="Click to sort by Date (Asc/Desc)"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>{t.opnameList.date}</span>
+                  {sortField === 'date' ? (
+                    sortOrder === 'asc' ? <ArrowUp size={13} className="text-blue-600" /> : <ArrowDown size={13} className="text-blue-600" />
+                  ) : (
+                    <ArrowUpDown size={12} className="text-gray-400 group-hover:text-gray-600" />
+                  )}
+                </div>
+              </th>
+              <th className="px-4 py-3">{t.opnameList.user}</th>
+              <th
+                onClick={() => handleSort('time')}
+                className="px-4 py-3 cursor-pointer hover:bg-gray-200 transition-colors select-none group"
+                title="Click to sort by Time (Asc/Desc)"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>{t.opnameList.time}</span>
+                  {sortField === 'time' ? (
+                    sortOrder === 'asc' ? <ArrowUp size={13} className="text-blue-600" /> : <ArrowDown size={13} className="text-blue-600" />
+                  ) : (
+                    <ArrowUpDown size={12} className="text-gray-400 group-hover:text-gray-600" />
+                  )}
+                </div>
+              </th>
+              <th className="px-4 py-3">{t.opnameList.batchId}</th>
               <th className="px-4 py-3 bg-blue-50 text-blue-800">Grade SAP</th>
               <th className="px-4 py-3 bg-purple-50 text-purple-800">Grade Mother</th>
               <th className="px-4 py-3 bg-orange-50 text-orange-800">Grade Cut</th>
