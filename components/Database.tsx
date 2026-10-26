@@ -6,6 +6,7 @@ import { Database as DbIcon, RefreshCcw, FileUp, AlertCircle, Trash2, Save, Fold
 import BackupModal from './BackupModal';
 import BackupList from './BackupList';
 import { useI18n } from '../i18n';
+import { parseCsvRows, parseNumericSafe } from '../utils/csvHelper';
 
 interface Props {
   role: UserRole;
@@ -41,21 +42,26 @@ const Database: React.FC<Props> = ({ role, isLocked = false, userName = '' }) =>
     setLoading(true);
     const reader = new FileReader();
     reader.onload = async (e) => {
-      let text = e.target?.result as string;
-      if (text.charCodeAt(0) === 0xFEFF) { text = text.slice(1); }
-      const rows = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').slice(1);
-      if (rows.length === 0) { setLoading(false); return; }
-      const firstRow = rows.find(r => r.trim().length > 0) || rows[0];
-      const delimiters = [',', ';', '\t', '|'];
-      let delimiter = ',';
-      let maxCols = 0;
-      delimiters.forEach(d => { const cols = firstRow.split(d).length; if (cols > maxCols) { maxCols = cols; delimiter = d; } });
-      const records: SlabRecord[] = rows.map(row => {
-        if (!row.trim()) return null;
-        const columns = row.split(delimiter);
-        const parseFloatSafe = (val: string) => { if (!val) return 0; let cleanVal = val.replace(/['"]/g, '').trim(); if (delimiter !== ',' && cleanVal.includes(',')) { cleanVal = cleanVal.replace(',', '.'); } return parseFloat(cleanVal) || 0; };
-        return { batch_id: columns[0]?.trim(), grade: columns[1]?.trim() || 'N/A', thickness: parseFloatSafe(columns[2]), width: parseFloatSafe(columns[3]), length: parseFloatSafe(columns[4]), slab_weight: parseFloatSafe(columns[5]) };
-      }).filter((r): r is SlabRecord => r !== null && !!r.batch_id);
+      const text = e.target?.result as string;
+      const allRows = parseCsvRows(text);
+      if (allRows.length <= 1) { 
+        setLoading(false); 
+        alert("The uploaded CSV is empty or only contains headers.");
+        return; 
+      }
+      const dataRows = allRows.slice(1);
+      const records: SlabRecord[] = dataRows.map(columns => {
+        const batch_id = (columns[0] || '').trim().toUpperCase();
+        if (!batch_id) return null;
+        return {
+          batch_id,
+          grade: (columns[1] || '').trim() || 'N/A',
+          thickness: parseNumericSafe(columns[2]),
+          width: parseNumericSafe(columns[3]),
+          length: parseNumericSafe(columns[4]),
+          slab_weight: parseNumericSafe(columns[5])
+        };
+      }).filter((r): r is SlabRecord => r !== null);
       try {
         await uploadStockCSV(type, records, file);
         await loadSummary();

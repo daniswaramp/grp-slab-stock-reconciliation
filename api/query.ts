@@ -5,6 +5,7 @@ const ALLOWED_TABLES = new Set([
   'sap_stock',
   'mother_slab_stock',
   'cut_slab_stock',
+  'supplier_slab_import',
   'opname_records',
   'locations',
   'users_online',
@@ -49,6 +50,113 @@ export default async function handler(req: any, res: any) {
     const authUser = verifyToken(req.headers.authorization);
     if (!authUser) {
       return res.status(401).json({ error: 'Authentication required. Please log in.' });
+    }
+
+    // SMART SEARCH & DECODER: One-trip lookup across stock + supplier data
+    if (action === 'search_slabs_with_supplier') {
+      const { code } = req.body;
+      if (!code || typeof code !== 'string') {
+        return res.status(200).json({ sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null });
+      }
+
+      const cleanCode = code.trim().toUpperCase();
+      const parts = cleanCode.split(/[\s\-_/.]+/);
+      const isMultiPart = parts.length >= 2 && parts[0].length >= 3 && parts[1].length >= 1;
+
+      let supplierMatches: any[] = [];
+      let decodedDirectMatch: any = null;
+
+      if (isMultiPart) {
+        const heat = parts[0];
+        const slab = parts[1];
+        const concat = heat + slab;
+        supplierMatches = await (db as any)(
+          `SELECT batch_id, heat_no, no_slab, heat_slab_concat, supplier_name, grade, thickness, width, length, weight_ton
+           FROM "supplier_slab_import"
+           WHERE (LOWER(heat_no) = LOWER($1) AND (no_slab = $2 OR no_slab = $3 OR no_slab = $4))
+              OR LOWER(heat_slab_concat) = LOWER($5)
+           LIMIT 10;`,
+          [heat, slab, '0' + slab, slab + '0', concat]
+        );
+        if (supplierMatches.length > 0) {
+          decodedDirectMatch = supplierMatches[0];
+        }
+      } else {
+        supplierMatches = await (db as any)(
+          `SELECT batch_id, heat_no, no_slab, heat_slab_concat, supplier_name, grade, thickness, width, length, weight_ton
+           FROM "supplier_slab_import"
+           WHERE LOWER(heat_no) = LOWER($1)
+              OR LOWER(heat_slab_concat) = LOWER($1)
+              OR batch_id ILIKE $2
+           ORDER BY batch_id ASC
+           LIMIT 20;`,
+          [cleanCode, `%${cleanCode}%`]
+        );
+        if (supplierMatches.length === 1) {
+          decodedDirectMatch = supplierMatches[0];
+        }
+      }
+
+      // Collect target batch IDs to query stock tables
+      const batchIdsToQuery = new Set<string>();
+      batchIdsToQuery.add(cleanCode);
+      supplierMatches.forEach(s => {
+        if (s.batch_id) batchIdsToQuery.add(s.batch_id.toUpperCase());
+      });
+
+      const batchList = Array.from(batchIdsToQuery);
+
+      // Query stock & opname tables for these batch IDs or pattern
+      const [sapRes, motherRes, cutRes, opnameRes] = await Promise.all([
+        (db as any)(
+          `SELECT * FROM "sap_stock" WHERE batch_id = ANY($1) OR batch_id ILIKE $2 LIMIT 25;`,
+          [batchList, `%${cleanCode}%`]
+        ),
+        (db as any)(
+          `SELECT * FROM "mother_slab_stock" WHERE batch_id = ANY($1) OR batch_id ILIKE $2 LIMIT 25;`,
+          [batchList, `%${cleanCode}%`]
+        ),
+        (db as any)(
+          `SELECT * FROM "cut_slab_stock" WHERE batch_id = ANY($1) OR batch_id ILIKE $2 LIMIT 25;`,
+          [batchList, `%${cleanCode}%`]
+        ),
+        (db as any)(
+          `SELECT * FROM "opname_records" WHERE batch_id = ANY($1) OR batch_id ILIKE $2 LIMIT 20;`,
+          [batchList, `%${cleanCode}%`]
+        )
+      ]);
+
+      // If supplier matches found, also fetch supplier metadata for all returned stock items
+      const returnedBatchIds = Array.from(new Set([
+        ...sapRes.map((r: any) => r.batch_id),
+        ...motherRes.map((r: any) => r.batch_id),
+        ...cutRes.map((r: any) => r.batch_id),
+        ...opnameRes.map((r: any) => r.batch_id),
+        ...batchList
+      ]));
+
+      const extraSupplier = await (db as any)(
+        `SELECT batch_id, heat_no, no_slab, heat_slab_concat, supplier_name, grade, thickness, width, length, weight_ton
+         FROM "supplier_slab_import"
+         WHERE batch_id = ANY($1);`,
+        [returnedBatchIds]
+      );
+
+      const supplierMap: Record<string, any> = {};
+      [...supplierMatches, ...extraSupplier].forEach(s => {
+        if (s.batch_id) {
+          supplierMap[s.batch_id.toUpperCase()] = s;
+        }
+      });
+
+      return res.status(200).json({
+        sap: sapRes || [],
+        mother: motherRes || [],
+        cut: cutRes || [],
+        opname: opnameRes || [],
+        supplierMap,
+        decodedDirectMatch
+      });
     }
 
     if (!table || !ALLOWED_TABLES.has(table)) {

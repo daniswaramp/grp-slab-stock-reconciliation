@@ -1,11 +1,12 @@
 
 import { supabase } from '../supabaseClient';
-import { SlabRecord, OpnameRecord, Location, OpnameBackup } from '../types';
+import { SlabRecord, OpnameRecord, Location, OpnameBackup, SupplierSlabRecord } from '../types';
 
 export const StockTables = {
   SAP: 'sap_stock',
   MOTHER: 'mother_slab_stock',
-  CUT: 'cut_slab_stock'
+  CUT: 'cut_slab_stock',
+  SUPPLIER: 'supplier_slab_import'
 };
 
 const BUCKET_NAME = 'Slab_Opname';
@@ -160,27 +161,45 @@ export const updateSystemNotification = async (text: string) => {
   if (error) throw error;
 };
 
-export const searchSlab = async (code: string) => {
-  if (!code) return { sap: [], mother: [], cut: [], opname: [] };
-  
-  const { data: opnameRes } = await supabase
-    .from('opname_records')
-    .select('*')
-    .ilike('batch_id', `%${code}%`)
-    .limit(5);
+export const searchSlab = async (code: string): Promise<{
+  sap: SlabRecord[];
+  mother: SlabRecord[];
+  cut: SlabRecord[];
+  opname: OpnameRecord[];
+  supplierMap: Record<string, SupplierSlabRecord>;
+  decodedDirectMatch: SupplierSlabRecord | null;
+}> => {
+  if (!code || !code.trim()) {
+    return { sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null };
+  }
 
-  const [sapRes, motherRes, cutRes] = await Promise.all([
-    supabase.from(StockTables.SAP).select('*').ilike('batch_id', `%${code}%`).limit(10),
-    supabase.from(StockTables.MOTHER).select('*').ilike('batch_id', `%${code}%`).limit(10),
-    supabase.from(StockTables.CUT).select('*').ilike('batch_id', `%${code}%`).limit(10)
-  ]);
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('slab_opname_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  return {
-    sap: sapRes.data || [],
-    mother: motherRes.data || [],
-    cut: cutRes.data || [],
-    opname: opnameRes || []
-  };
+  try {
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'search_slabs_with_supplier', code })
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      return {
+        sap: json.sap || [],
+        mother: json.mother || [],
+        cut: json.cut || [],
+        opname: json.opname || [],
+        supplierMap: json.supplierMap || {},
+        decodedDirectMatch: json.decodedDirectMatch || null
+      };
+    }
+  } catch (err) {
+    console.error('searchSlab error:', err);
+  }
+
+  return { sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null };
 };
 
 export const uploadEvidenceImage = async (file: File, filename: string) => {

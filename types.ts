@@ -9,6 +9,26 @@ export interface SlabRecord {
   source?: 'sap' | 'mother' | 'cut';
 }
 
+export interface SupplierSlabRecord {
+  id?: string;
+  batch_id: string;
+  heat_no: string;
+  no_slab: string;
+  heat_slab_concat?: string;
+  supplier_name: string;
+  thickness: number;
+  width: number;
+  length: number;
+  weight_ton: number;
+  weight_mtc?: number;
+  weight_actual?: number;
+  grade: string;
+  steel_grade?: string;
+  application?: string;
+  ce?: number;
+  pcm?: number;
+}
+
 export interface OpnameRecord {
   id?: string;
   created_at?: string;

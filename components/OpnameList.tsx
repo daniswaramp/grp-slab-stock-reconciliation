@@ -4,6 +4,7 @@ import { OpnameRecord, UserRole, OpnameBackup } from '../types';
 import { getBackups, saveBackup, loadBackup, fetchAllOpnameRecords, updateOpnameCacheFromPayload, clearDataset } from '../services/dataService';
 import { Download, Trash2, Filter, FileSpreadsheet, Save, RotateCcw, Upload, ChevronDown, Database, Link, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Clock } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { parseCsvRows, parseNumericSafe } from '../utils/csvHelper';
 
 interface Props {
   role: UserRole;
@@ -165,11 +166,14 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
             const isCsv = file.name.toLowerCase().endsWith('.csv');
 
             if (isCsv) {
-                const lines = content.split('\n').map(l => l.trim()).filter(l => l);
-                data = lines.slice(1).map(line => {
-                    const cols = line.split(',').map(c => c.trim());
-                    const num = (v: string) => (v && v !== '-' ? Number(v) : undefined);
-                    const str = (v: string) => (v && v !== '-' ? v : '');
+                const allRows = parseCsvRows(content);
+                const dataRows = allRows.slice(1);
+                data = dataRows.map(cols => {
+                    const num = (v: string) => {
+                      const n = parseNumericSafe(v);
+                      return n !== 0 ? n : (v === '0' ? 0 : undefined);
+                    };
+                    const str = (v: string) => (v && v !== '-' ? String(v).trim() : '');
 
                     const date = str(cols[0]);
                     const user_name = str(cols[1]);

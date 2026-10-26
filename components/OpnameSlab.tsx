@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { searchSlab, saveOpnameRecord, uploadEvidenceImage } from '../services/dataService';
-import { SlabRecord, OpnameRecord, Location } from '../types';
+import { SlabRecord, OpnameRecord, Location, SupplierSlabRecord } from '../types';
 import { Check, Search, Save, X, ClipboardCheck, MousePointer2, Filter, Camera, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -30,7 +30,14 @@ const OpnameSlab: React.FC<Props> = ({
   isLocked = false
 }) => {
   const { t } = useI18n();
-  const [results, setResults] = useState<{ sap: SlabRecord[], mother: SlabRecord[], cut: SlabRecord[], opname: any[] }>({ sap: [], mother: [], cut: [], opname: [] });
+  const [results, setResults] = useState<{ 
+    sap: SlabRecord[]; 
+    mother: SlabRecord[]; 
+    cut: SlabRecord[]; 
+    opname: any[];
+    supplierMap?: Record<string, SupplierSlabRecord>;
+    decodedDirectMatch?: SupplierSlabRecord | null;
+  }>({ sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null });
   const [showPopup, setShowPopup] = useState<'Synchronized' | 'Missing Data' | 'Not Available' | null>(null);
   const [hideZero, setHideZero] = useState({ sap: false, mother: false, cut: false });
   const [location, setLocation] = useState('');
@@ -47,11 +54,14 @@ const OpnameSlab: React.FC<Props> = ({
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       const searchStr = selectedBatchId ? lastManualInput : searchInput;
-      if (searchStr) {
+      if (searchStr && searchStr.trim()) {
         const data = await searchSlab(searchStr);
         setResults(data);
+        if (data.decodedDirectMatch && !selectedBatchId) {
+          setSelectedBatchId(data.decodedDirectMatch.batch_id);
+        }
       } else {
-        setResults({ sap: [], mother: [], cut: [], opname: [] });
+        setResults({ sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null });
       }
     }, 300);
     return () => clearTimeout(delayDebounce);
@@ -70,10 +80,10 @@ const OpnameSlab: React.FC<Props> = ({
   const motherExists = currentMother.some(r => r.batch_id === selectedBatchId);
   const cutExists = currentCut.some(r => r.batch_id === selectedBatchId);
 
-  const hasRecommendations = (currentSap.length > 0 || currentMother.length > 0 || currentCut.length > 0);
+  const hasRecommendations = (currentSap.length > 0 || currentMother.length > 0 || currentCut.length > 0 || (results.decodedDirectMatch !== null));
   const canNotAvailable = !hasRecommendations;
   const canSync = selectedBatchId && ((sapExists && cutExists) || (sapExists && motherExists));
-  const canMissing = selectedBatchId && (sapExists || motherExists || cutExists) && !canSync;
+  const canMissing = selectedBatchId && (sapExists || motherExists || cutExists || (results.supplierMap && !!results.supplierMap[selectedBatchId.toUpperCase()])) && !canSync;
 
   const currentSearchTerm = selectedBatchId || searchInput;
   const showDuplicateWarning = currentSearchTerm && currentSearchTerm.length >= 5;
@@ -82,8 +92,9 @@ const OpnameSlab: React.FC<Props> = ({
   const allBatchIds = Array.from(new Set([
     ...currentSap.map(r => r.batch_id),
     ...currentMother.map(r => r.batch_id),
-    ...currentCut.map(r => r.batch_id)
-  ])).slice(0, 15);
+    ...currentCut.map(r => r.batch_id),
+    ...Object.keys(results.supplierMap || {})
+  ])).slice(0, 20);
 
   const handleAction = (type: 'Synchronized' | 'Missing Data' | 'Not Available') => {
     if (type !== 'Not Available' && !selectedBatchId) {
@@ -168,7 +179,24 @@ const OpnameSlab: React.FC<Props> = ({
       const sap = currentSap.find(r => r.batch_id === batchIdToSubmit);
       const mother = currentMother.find(r => r.batch_id === batchIdToSubmit);
       const cut = currentCut.find(r => r.batch_id === batchIdToSubmit);
-      const ref = mother || cut || sap;
+      const supplier = results.supplierMap?.[batchIdToSubmit.toUpperCase()];
+      const ref = mother || cut || sap || (supplier ? {
+        grade: supplier.grade,
+        thickness: supplier.thickness,
+        width: supplier.width,
+        length: supplier.length,
+        slab_weight: supplier.weight_ton
+      } : null);
+
+      const supplierPhysicalStamp = supplier ? `${supplier.heat_no} ${supplier.no_slab}` : (lastManualInput !== batchIdToSubmit ? lastManualInput : batchIdToSubmit);
+
+      let finalRemarks = remarks;
+      if (supplier) {
+        const suppNote = `[Supplier: ${supplier.supplier_name} | Mark: ${supplierPhysicalStamp}]`;
+        if (!finalRemarks.includes(suppNote)) {
+          finalRemarks = finalRemarks ? `${finalRemarks} ${suppNote}` : suppNote;
+        }
+      }
 
       const record: OpnameRecord = {
         user_name: userName,
@@ -179,7 +207,7 @@ const OpnameSlab: React.FC<Props> = ({
         dimension_match: checks.dimension,
         grade_match: checks.grade,
         batch_match: true,
-        remarks,
+        remarks: finalRemarks,
         grade_sap: sap?.grade || '',
         grade_mother: mother?.grade || '',
         grade_cut: cut?.grade || '',
@@ -190,7 +218,7 @@ const OpnameSlab: React.FC<Props> = ({
         actual_width: !checks.dimension ? Number(manualInput.width) : undefined,
         actual_length: !checks.dimension ? Number(manualInput.length) : undefined,
         actual_grade: !checks.grade ? manualInput.grade : undefined,
-        actual_batch_id: batchIdToSubmit,
+        actual_batch_id: supplierPhysicalStamp,
         gang_baris: gangBaris,
         image_url: imageUrl
       };
@@ -276,17 +304,61 @@ const OpnameSlab: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Active Selection Chip (Separate on Mobile & Desktop to prevent text collision) */}
+        {/* Decoded Physical Stamp Notification */}
+        {results.decodedDirectMatch && (
+          <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-950 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm animate-fadeIn">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
+                <Search size={16} />
+              </span>
+              <div className="text-xs">
+                <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                  <span className="text-emerald-800">Decoded Stamp:</span>
+                  <span className="font-mono bg-white border border-emerald-300 px-1.5 py-0.5 rounded text-emerald-950">
+                    {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
+                  </span>
+                  <span className="text-emerald-400">➔</span>
+                  <span className="font-mono bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm">
+                    {results.decodedDirectMatch.batch_id}
+                  </span>
+                </div>
+                <div className="text-[11px] text-emerald-700 mt-1 font-medium">
+                  Supplier: <strong>{results.decodedDirectMatch.supplier_name}</strong> | Grade: {results.decodedDirectMatch.grade} | {results.decodedDirectMatch.thickness}x{results.decodedDirectMatch.width}x{results.decodedDirectMatch.length} mm ({(Number(results.decodedDirectMatch.weight_ton) || 0).toFixed(3)} MT)
+                </div>
+              </div>
+            </div>
+            {selectedBatchId !== results.decodedDirectMatch.batch_id && (
+              <button
+                onClick={() => handleSelectBatch(results.decodedDirectMatch!.batch_id)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow active:scale-95 shrink-0 self-end sm:self-auto"
+              >
+                Select {results.decodedDirectMatch.batch_id}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Active Selection Chip */}
         {selectedBatchId && (
-          <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-900 px-3 py-2 rounded-xl flex items-center justify-between shadow-sm animate-fadeIn">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
-              <span className="text-[10px] sm:text-xs text-blue-700 uppercase font-bold tracking-wider shrink-0">{t.opnameSlab.activeSelection}:</span>
-              <span className="font-mono font-black text-xs sm:text-sm text-blue-950 truncate">{selectedBatchId}</span>
+          <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-900 px-3.5 py-2.5 rounded-xl flex items-center justify-between shadow-sm animate-fadeIn">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 overflow-hidden">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
+                <span className="text-[10px] sm:text-xs text-blue-700 uppercase font-bold tracking-wider shrink-0">{t.opnameSlab.activeSelection}:</span>
+                <span className="font-mono font-black text-sm sm:text-base text-blue-950 truncate">{selectedBatchId}</span>
+              </div>
+              {results.supplierMap?.[selectedBatchId.toUpperCase()] && (
+                <div className="inline-flex items-center gap-1.5 bg-white border border-blue-200 px-2 py-0.5 rounded-lg text-xs font-mono text-blue-900 shrink-0">
+                  <span className="text-[10px] uppercase font-sans font-bold text-gray-500">Supplier Mark:</span>
+                  <span className="font-bold">{results.supplierMap[selectedBatchId.toUpperCase()].heat_no} {results.supplierMap[selectedBatchId.toUpperCase()].no_slab}</span>
+                  <span className="text-gray-400">({results.supplierMap[selectedBatchId.toUpperCase()].heat_slab_concat})</span>
+                  <span className="text-[10px] font-sans text-gray-500 font-bold">[{results.supplierMap[selectedBatchId.toUpperCase()].supplier_name}]</span>
+                </div>
+              )}
             </div>
             <button 
               onClick={() => handleSelectBatch(selectedBatchId)} 
-              className="text-xs font-bold text-red-500 hover:text-red-700 bg-white border border-red-200 px-2 py-0.5 rounded-lg flex items-center gap-1 active:scale-95 shrink-0 ml-2"
+              className="text-xs font-bold text-red-500 hover:text-red-700 bg-white border border-red-200 px-2 py-1 rounded-lg flex items-center gap-1 active:scale-95 shrink-0 ml-2"
               title="Deselect"
             >
               <X size={12} /> Deselect
@@ -384,9 +456,21 @@ const OpnameSlab: React.FC<Props> = ({
                   return (
                     <tr key={batchId} onClick={() => handleSelectBatch(batchId)} className={`cursor-pointer transition-all duration-200 group ${isSelected ? 'bg-blue-50 ring-2 ring-inset ring-blue-600/20' : 'hover:bg-gray-50'}`}>
                       <td className="px-3 sm:px-6 py-3 sm:py-4 font-bold border-r border-gray-100 sticky left-0 bg-white group-hover:bg-gray-50 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)]">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-gray-900 font-mono text-xs sm:text-sm">{batchId}</span>
-                          {isSelected ? <Check size={16} className="text-blue-600 shrink-0" strokeWidth={3} /> : <MousePointer2 size={13} className="opacity-0 group-hover:opacity-100 text-blue-400 transition-opacity shrink-0" />}
+                        <div className="flex items-start justify-between gap-1">
+                          <div>
+                            <span className="text-gray-900 font-mono text-xs sm:text-sm font-black">{batchId}</span>
+                            {results.supplierMap?.[batchId.toUpperCase()] && (
+                              <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-tight">
+                                  Mark: {results.supplierMap[batchId.toUpperCase()].heat_no} {results.supplierMap[batchId.toUpperCase()].no_slab} ({results.supplierMap[batchId.toUpperCase()].heat_slab_concat})
+                                </span>
+                                <span className="text-[9px] text-gray-500 font-bold uppercase hidden sm:inline">
+                                  {results.supplierMap[batchId.toUpperCase()].supplier_name}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {isSelected ? <Check size={16} className="text-blue-600 shrink-0 mt-0.5" strokeWidth={3} /> : <MousePointer2 size={13} className="opacity-0 group-hover:opacity-100 text-blue-400 transition-opacity shrink-0 mt-0.5" />}
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4 border-r border-gray-100">
@@ -437,8 +521,16 @@ const OpnameSlab: React.FC<Props> = ({
             
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-white text-black">
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Reconciliation Batch</label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Target Batch ID (GRP Heat Setup)</label>
                 <p className="text-xl sm:text-2xl font-black text-gray-900 font-mono tracking-tight break-all">{selectedBatchId || searchInput}</p>
+                {results.supplierMap?.[(selectedBatchId || searchInput).toUpperCase()] && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-lg text-xs font-mono text-amber-900">
+                    <span className="font-sans font-bold text-amber-800 text-[10px] uppercase">Supplier Heat Mark:</span>
+                    <span className="font-black">{results.supplierMap[(selectedBatchId || searchInput).toUpperCase()].heat_no} {results.supplierMap[(selectedBatchId || searchInput).toUpperCase()].no_slab}</span>
+                    <span className="text-amber-600 font-bold">({results.supplierMap[(selectedBatchId || searchInput).toUpperCase()].heat_slab_concat})</span>
+                    <span className="font-sans text-[11px] text-gray-600 font-bold">[{results.supplierMap[(selectedBatchId || searchInput).toUpperCase()].supplier_name}]</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
