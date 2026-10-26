@@ -6,34 +6,35 @@
  * Universal safe numeric parser that automatically converts comma decimals to dots,
  * strips quotes and thousand-separators, and handles European & Indonesian Excel formats.
  * e.g.:
- *  "24,3"   -> 24.3
- *  "24.3"   -> 24.3
- *  "9,800"  -> 9800
+ *  "24,3"    -> 24.3
+ *  "24.3"    -> 24.3
+ *  "9,800"   -> 9800
  *  "1.250,5" -> 1250.5
- *  "-"      -> 0
+ *  "1,250.5" -> 1250.5
+ *  "-"       -> 0
  */
 export function parseNumericSafe(val: any): number {
   if (val === null || val === undefined) return 0;
   let clean = String(val).replace(/['"]/g, '').trim();
   if (!clean || clean === '-' || clean === 'N/A' || clean === 'null') return 0;
 
-  // Handle pure comma decimal: e.g. "24,3" or "0,52"
-  if (/^-?\d+,\d+$/.test(clean)) {
-    clean = clean.replace(',', '.');
-  } 
-  // Handle integer with thousand separators: e.g. "9,800" or "12,000"
-  else if (/^-?\d{1,3}(,\d{3})+$/.test(clean)) {
-    clean = clean.replace(/,/g, '');
-  } 
-  // Handle European thousand dot and comma decimal: e.g. "1.250,50"
-  else if (clean.includes(',') && clean.includes('.')) {
+  // 1. Handle European thousand dot and comma decimal: e.g. "1.250,50" or "1,250.50"
+  if (clean.includes(',') && clean.includes('.')) {
     if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
       clean = clean.replace(/\./g, '').replace(',', '.');
     } else {
       clean = clean.replace(/,/g, '');
     }
   } 
-  // Fallback: single comma without dots
+  // 2. Handle integer with thousand separators: e.g. "9,800" or "12,000"
+  else if (/^-?\d{1,3}(,\d{3})+$/.test(clean)) {
+    clean = clean.replace(/,/g, '');
+  } 
+  // 3. Handle pure comma decimal: e.g. "24,3" or "0,52"
+  else if (/^-?\d+,\d+$/.test(clean)) {
+    clean = clean.replace(',', '.');
+  } 
+  // 4. Fallback: single comma without dots
   else if (clean.includes(',') && !clean.includes('.')) {
     clean = clean.replace(',', '.');
   }

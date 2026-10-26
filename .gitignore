@@ -27,3 +27,4 @@ data/
 *.py
 .vercel
 .env*
+database/
