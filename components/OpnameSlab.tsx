@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { searchSlab, saveOpnameRecord, uploadEvidenceImage } from '../services/dataService';
 import { SlabRecord, OpnameRecord, Location, SupplierSlabRecord } from '../types';
-import { Check, Search, Save, X, ClipboardCheck, MousePointer2, Filter, Camera, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Check, Search, Save, X, ClipboardCheck, MousePointer2, Filter, Camera, AlertTriangle, Image as ImageIcon, Archive, Info } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 interface Props {
@@ -58,7 +58,15 @@ const OpnameSlab: React.FC<Props> = ({
         const data = await searchSlab(searchStr);
         setResults(data);
         if (data.decodedDirectMatch && !selectedBatchId) {
-          setSelectedBatchId(data.decodedDirectMatch.batch_id);
+          // IMPORTANT: Supplier dataset is purely an encoding reference (2024-2026).
+          // Only auto-select as Target Batch ID if it actually exists in current stock (SAP, Mother, or Cut).
+          // If not in stock, it means the slab was already used/consumed — no opname required.
+          const inStock = (data.sap && data.sap.some(r => r.batch_id === data.decodedDirectMatch!.batch_id)) ||
+                          (data.mother && data.mother.some(r => r.batch_id === data.decodedDirectMatch!.batch_id)) ||
+                          (data.cut && data.cut.some(r => r.batch_id === data.decodedDirectMatch!.batch_id));
+          if (inStock) {
+            setSelectedBatchId(data.decodedDirectMatch.batch_id);
+          }
         }
       } else {
         setResults({ sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null });
@@ -80,21 +88,29 @@ const OpnameSlab: React.FC<Props> = ({
   const motherExists = currentMother.some(r => r.batch_id === selectedBatchId);
   const cutExists = currentCut.some(r => r.batch_id === selectedBatchId);
 
-  const hasRecommendations = (currentSap.length > 0 || currentMother.length > 0 || currentCut.length > 0 || (results.decodedDirectMatch !== null));
+  // Recommendations and actions are strictly based on current stock records (SAP, Mother, Cut)
+  const hasRecommendations = (currentSap.length > 0 || currentMother.length > 0 || currentCut.length > 0);
   const canNotAvailable = !hasRecommendations;
   const canSync = selectedBatchId && ((sapExists && cutExists) || (sapExists && motherExists));
-  const canMissing = selectedBatchId && (sapExists || motherExists || cutExists || (results.supplierMap && !!results.supplierMap[selectedBatchId.toUpperCase()])) && !canSync;
+  const canMissing = selectedBatchId && (sapExists || motherExists || cutExists) && !canSync;
 
   const currentSearchTerm = selectedBatchId || searchInput;
   const showDuplicateWarning = currentSearchTerm && currentSearchTerm.length >= 5;
   const duplicateMatch = showDuplicateWarning ? results.opname.find(r => r.batch_id === currentSearchTerm) : null;
 
+  // The matrix must ONLY show slabs that actually exist in active stock datasets (SAP, Mother, Cut).
+  // Historical supplier import records that are consumed do NOT appear as matrix rows.
   const allBatchIds = Array.from(new Set([
     ...currentSap.map(r => r.batch_id),
     ...currentMother.map(r => r.batch_id),
-    ...currentCut.map(r => r.batch_id),
-    ...Object.keys(results.supplierMap || {})
+    ...currentCut.map(r => r.batch_id)
   ])).slice(0, 20);
+
+  const isDecodedInStock = results.decodedDirectMatch ? (
+    currentSap.some(r => r.batch_id === results.decodedDirectMatch!.batch_id) ||
+    currentMother.some(r => r.batch_id === results.decodedDirectMatch!.batch_id) ||
+    currentCut.some(r => r.batch_id === results.decodedDirectMatch!.batch_id)
+  ) : false;
 
   const handleAction = (type: 'Synchronized' | 'Missing Data' | 'Not Available') => {
     if (type !== 'Not Available' && !selectedBatchId) {
@@ -306,36 +322,70 @@ const OpnameSlab: React.FC<Props> = ({
 
         {/* Decoded Physical Stamp Notification */}
         {results.decodedDirectMatch && (
-          <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-950 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm animate-fadeIn">
-            <div className="flex items-start sm:items-center gap-2.5">
-              <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
-                <Search size={16} />
-              </span>
-              <div className="text-xs">
-                <div className="flex flex-wrap items-center gap-1.5 font-bold">
-                  <span className="text-emerald-800">Decoded Stamp:</span>
-                  <span className="font-mono bg-white border border-emerald-300 px-1.5 py-0.5 rounded text-emerald-950">
-                    {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
-                  </span>
-                  <span className="text-emerald-400">➔</span>
-                  <span className="font-mono bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm">
-                    {results.decodedDirectMatch.batch_id}
-                  </span>
+          isDecodedInStock ? (
+            <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-950 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm animate-fadeIn">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
+                  <Search size={16} />
+                </span>
+                <div className="text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                    <span className="text-emerald-800">Decoded Stamp:</span>
+                    <span className="font-mono bg-white border border-emerald-300 px-1.5 py-0.5 rounded text-emerald-950">
+                      {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
+                    </span>
+                    <span className="text-emerald-400">➔</span>
+                    <span className="font-mono bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm">
+                      {results.decodedDirectMatch.batch_id}
+                    </span>
+                    <span className="bg-emerald-600 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded shadow-xs">
+                      In Current Stock
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-emerald-700 mt-1 font-medium">
+                    Supplier: <strong>{results.decodedDirectMatch.supplier_name}</strong> | Grade: {results.decodedDirectMatch.grade} | {results.decodedDirectMatch.thickness}x{results.decodedDirectMatch.width}x{results.decodedDirectMatch.length} mm ({(Number(results.decodedDirectMatch.weight_ton) || 0).toFixed(3)} MT)
+                  </div>
                 </div>
-                <div className="text-[11px] text-emerald-700 mt-1 font-medium">
-                  Supplier: <strong>{results.decodedDirectMatch.supplier_name}</strong> | Grade: {results.decodedDirectMatch.grade} | {results.decodedDirectMatch.thickness}x{results.decodedDirectMatch.width}x{results.decodedDirectMatch.length} mm ({(Number(results.decodedDirectMatch.weight_ton) || 0).toFixed(3)} MT)
+              </div>
+              {selectedBatchId !== results.decodedDirectMatch.batch_id && (
+                <button
+                  onClick={() => handleSelectBatch(results.decodedDirectMatch!.batch_id)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow active:scale-95 shrink-0 self-end sm:self-auto"
+                >
+                  Select {results.decodedDirectMatch.batch_id}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="mb-3 bg-slate-50 border border-slate-300 text-slate-800 p-3.5 rounded-xl shadow-sm animate-fadeIn">
+              <div className="flex items-start gap-2.5">
+                <span className="p-1.5 bg-slate-200 text-slate-700 rounded-lg shrink-0 mt-0.5">
+                  <Archive size={16} />
+                </span>
+                <div className="text-xs flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                    <span className="text-slate-700">Historical Reference:</span>
+                    <span className="font-mono bg-white border border-slate-300 px-1.5 py-0.5 rounded text-slate-900">
+                      {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
+                    </span>
+                    <span className="text-slate-400">➔</span>
+                    <span className="font-mono bg-slate-700 text-white px-2 py-0.5 rounded shadow-sm">
+                      {results.decodedDirectMatch.batch_id}
+                    </span>
+                    <span className="bg-slate-200 text-slate-700 border border-slate-300 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">
+                      Already Used / Consumed
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-1 font-medium leading-relaxed">
+                    This slab exists in the 2024–2026 supplier import records (<strong>{results.decodedDirectMatch.supplier_name}</strong>), but is <strong>not present in current SAP, Mother Slab, or Cut Slab stock</strong>. It has already been consumed in production — <strong className="text-slate-900">no opname is required</strong>.
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    *If you physically found this slab unexpectedly in the yard, you can record it via <strong>"Not Available in Stock"</strong>.
+                  </p>
                 </div>
               </div>
             </div>
-            {selectedBatchId !== results.decodedDirectMatch.batch_id && (
-              <button
-                onClick={() => handleSelectBatch(results.decodedDirectMatch!.batch_id)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow active:scale-95 shrink-0 self-end sm:self-auto"
-              >
-                Select {results.decodedDirectMatch.batch_id}
-              </button>
-            )}
-          </div>
+          )
         )}
 
         {/* Active Selection Chip */}
@@ -503,7 +553,30 @@ const OpnameSlab: React.FC<Props> = ({
                     </tr>
                   )
                 })}
-                {allBatchIds.length === 0 && (<tr className="bg-white"><td colSpan={4} className="px-4 py-12 text-center text-gray-400 font-bold italic uppercase tracking-widest text-[11px]">No matching records found</td></tr>)}
+                {allBatchIds.length === 0 && (
+                  <tr className="bg-white">
+                    <td colSpan={4} className="px-4 py-10 text-center text-gray-500 font-medium text-xs">
+                      {Object.keys(results.supplierMap || {}).length > 0 ? (
+                        <div className="max-w-md mx-auto space-y-1.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                          <p className="font-bold text-slate-800 text-xs sm:text-sm flex items-center justify-center gap-1.5">
+                            <Archive size={15} className="text-slate-600" />
+                            No Active Yard Stock for this Search
+                          </p>
+                          <p className="text-[11px] text-slate-600 leading-normal">
+                            Found {Object.keys(results.supplierMap || {}).length} record(s) in historical supplier import (2024–2026), but none currently exist in SAP, Mother Slab, or Cut Slab stock.
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                            Slabs already consumed / used in production — No Opname Required
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 font-bold italic uppercase tracking-widest text-[11px]">
+                          No matching records found in active stock
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
