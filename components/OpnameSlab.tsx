@@ -57,13 +57,8 @@ const OpnameSlab: React.FC<Props> = ({
       if (searchStr && searchStr.trim()) {
         const data = await searchSlab(searchStr);
         setResults(data);
-        if (data.decodedDirectMatch && !selectedBatchId) {
-          // When a physical stamp is decoded (e.g. 13392-4 or 1031512 520),
-          // set the Target Batch ID to the decoded GRP Batch ID.
-          // If in stock -> Synchronize / Missing Data
-          // If not in stock -> Not Available ("goods exist in yard, but dataset is missing")
-          setSelectedBatchId(data.decodedDirectMatch.batch_id);
-        }
+        // Do NOT auto-select! Decoded matches are displayed as explicit suggestions,
+        // allowing the user to freely edit, backspace, or choose without lock-out.
       } else {
         setResults({ sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null });
       }
@@ -116,8 +111,9 @@ const OpnameSlab: React.FC<Props> = ({
   ) : false;
 
   const handleAction = (type: 'Synchronized' | 'Missing Data' | 'Not Available') => {
+    const targetBatch = selectedBatchId || (results.decodedDirectMatch?.batch_id) || searchInput;
     if (type !== 'Not Available' && !selectedBatchId) {
-      alert("Please select a Target Batch ID from the matrix first.");
+      alert("Please select a Target Batch ID from the suggestions or matrix first.");
       return;
     }
     setShowPopup(type);
@@ -126,7 +122,6 @@ const OpnameSlab: React.FC<Props> = ({
     setEvidenceFile(null);
     setEvidencePreview(null);
     
-    const targetBatch = selectedBatchId || searchInput;
     const supplier = results.supplierMap?.[targetBatch.toUpperCase()] || results.decodedDirectMatch;
 
     if (type === 'Not Available') {
@@ -148,9 +143,11 @@ const OpnameSlab: React.FC<Props> = ({
   const handleInputChange = (val: string) => {
     const upperVal = val.toUpperCase();
     setSearchInput(upperVal);
-    if (!selectedBatchId) {
-      setLastManualInput(upperVal);
+    // If the user starts typing while a batch was selected, deselect it so they can freely type and search without lockout!
+    if (selectedBatchId) {
+      setSelectedBatchId(null);
     }
+    setLastManualInput(upperVal);
   };
 
   const handleSelectBatch = (id: string) => {
@@ -189,7 +186,7 @@ const OpnameSlab: React.FC<Props> = ({
       }
     }
 
-    const batchIdToSubmit = selectedBatchId || searchInput;
+    const batchIdToSubmit = selectedBatchId || (results.decodedDirectMatch?.batch_id) || searchInput;
     if (batchIdToSubmit === lastSubmittedBatchId) {
       if (!confirm("You just submitted this Batch ID. Are you sure you want to submit a duplicate?")) return;
     }
@@ -210,7 +207,7 @@ const OpnameSlab: React.FC<Props> = ({
       const sap = currentSap.find(r => r.batch_id === batchIdToSubmit);
       const mother = currentMother.find(r => r.batch_id === batchIdToSubmit);
       const cut = currentCut.find(r => r.batch_id === batchIdToSubmit);
-      const supplier = results.supplierMap?.[batchIdToSubmit.toUpperCase()];
+      const supplier = results.supplierMap?.[batchIdToSubmit.toUpperCase()] || results.decodedDirectMatch;
       const ref = mother || cut || sap || (supplier ? {
         grade: supplier.grade,
         thickness: supplier.thickness,
@@ -335,44 +332,51 @@ const OpnameSlab: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Decoded Physical Stamp Notification */}
+        {/* Decoded Physical Stamp Suggestion Banner (Suggest first, never auto-lock) */}
         {results.decodedDirectMatch && (
           isDecodedInStock ? (
-            <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-950 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm animate-fadeIn">
-              <div className="flex items-start sm:items-center gap-2.5">
-                <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
-                  <Search size={16} />
-                </span>
-                <div className="text-xs">
-                  <div className="flex flex-wrap items-center gap-1.5 font-bold">
-                    <span className="text-emerald-800">Decoded Stamp:</span>
-                    <span className="font-mono bg-white border border-emerald-300 px-1.5 py-0.5 rounded text-emerald-950">
-                      {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
-                    </span>
-                    <span className="text-emerald-400">➔</span>
-                    <span className="font-mono bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm">
-                      {results.decodedDirectMatch.batch_id}
-                    </span>
-                    <span className="bg-emerald-600 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded shadow-xs">
-                      In Current Stock
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-emerald-700 mt-1 font-medium">
-                    Supplier: <strong>{results.decodedDirectMatch.supplier_name}</strong> | Grade: {results.decodedDirectMatch.grade} | {results.decodedDirectMatch.thickness}x{results.decodedDirectMatch.width}x{results.decodedDirectMatch.length} mm ({(Number(results.decodedDirectMatch.weight_ton) || 0).toFixed(3)} MT)
+            <div className="mb-3 bg-emerald-50 border border-emerald-300 text-emerald-950 p-3 sm:p-3.5 rounded-xl shadow-sm animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
+                    <Search size={16} />
+                  </span>
+                  <div className="text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                      <span className="text-emerald-800">Suggested GRP Batch:</span>
+                      <span className="font-mono bg-blue-600 text-white px-2 py-0.5 rounded shadow-xs text-xs sm:text-sm">
+                        {results.decodedDirectMatch.batch_id}
+                      </span>
+                      <span className="bg-emerald-600 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded shadow-xs">
+                        In Current Stock
+                      </span>
+                      <span className="text-emerald-700 font-normal text-[11px]">
+                        (Decoded from: <strong>{results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab}</strong>)
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-emerald-800 mt-1 font-medium">
+                      Supplier: <strong>{results.decodedDirectMatch.supplier_name}</strong> | Grade: {results.decodedDirectMatch.grade} | {results.decodedDirectMatch.thickness}x{results.decodedDirectMatch.width}x{results.decodedDirectMatch.length} mm ({(Number(results.decodedDirectMatch.weight_ton) || 0).toFixed(3)} MT)
+                    </div>
                   </div>
                 </div>
+                {selectedBatchId !== results.decodedDirectMatch.batch_id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectBatch(results.decodedDirectMatch!.batch_id)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow active:scale-95 shrink-0 flex items-center justify-center gap-1.5 self-stretch sm:self-auto"
+                  >
+                    <Check size={14} strokeWidth={3} />
+                    <span>Select {results.decodedDirectMatch.batch_id}</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg shrink-0 flex items-center gap-1 self-end sm:self-auto">
+                    <Check size={14} /> Selected
+                  </span>
+                )}
               </div>
-              {selectedBatchId !== results.decodedDirectMatch.batch_id && (
-                <button
-                  onClick={() => handleSelectBatch(results.decodedDirectMatch!.batch_id)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow active:scale-95 shrink-0 self-end sm:self-auto"
-                >
-                  Select {results.decodedDirectMatch.batch_id}
-                </button>
-              )}
             </div>
           ) : (
-            <div className="mb-3 bg-amber-50 border border-amber-300 text-amber-950 p-3.5 rounded-xl shadow-sm animate-fadeIn">
+            <div className="mb-3 bg-amber-50 border border-amber-300 text-amber-950 p-3 sm:p-3.5 rounded-xl shadow-sm animate-fadeIn">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-2.5">
                   <span className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
@@ -380,16 +384,15 @@ const OpnameSlab: React.FC<Props> = ({
                   </span>
                   <div className="text-xs">
                     <div className="flex flex-wrap items-center gap-1.5 font-bold">
-                      <span className="text-amber-800">Decoded Physical Stamp:</span>
-                      <span className="font-mono bg-white border border-amber-300 px-1.5 py-0.5 rounded text-amber-950">
-                        {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
-                      </span>
-                      <span className="text-amber-400">➔</span>
-                      <span className="font-mono bg-red-600 text-white px-2 py-0.5 rounded shadow-sm">
+                      <span className="text-amber-800">Suggested GRP Batch:</span>
+                      <span className="font-mono bg-red-600 text-white px-2 py-0.5 rounded shadow-xs text-xs sm:text-sm">
                         {results.decodedDirectMatch.batch_id}
                       </span>
                       <span className="bg-red-100 text-red-800 border border-red-200 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">
                         Not in Stock Dataset
+                      </span>
+                      <span className="text-amber-800 font-normal text-[11px]">
+                        (Decoded from: <strong>{results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab}</strong>)
                       </span>
                     </div>
                     <div className="text-[11px] text-amber-900 mt-1 font-medium">
@@ -400,16 +403,69 @@ const OpnameSlab: React.FC<Props> = ({
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleAction('Not Available')}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow active:scale-95 shrink-0 flex items-center justify-center gap-1.5 self-stretch sm:self-auto"
-                >
-                  <X size={15} strokeWidth={2.5} />
-                  <span>Record as Not Available</span>
-                </button>
+                <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
+                  {selectedBatchId !== results.decodedDirectMatch.batch_id && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectBatch(results.decodedDirectMatch!.batch_id)}
+                      className="bg-white border border-gray-300 hover:border-gray-400 text-gray-800 font-bold text-xs px-3 py-2 rounded-xl shadow-xs active:scale-95 flex-1 sm:flex-none"
+                    >
+                      Select {results.decodedDirectMatch.batch_id}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBatchId(results.decodedDirectMatch!.batch_id);
+                      handleAction('Not Available');
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow active:scale-95 flex items-center justify-center gap-1.5 flex-1 sm:flex-none"
+                  >
+                    <X size={15} strokeWidth={2.5} />
+                    <span>Record as Not Available</span>
+                  </button>
+                </div>
               </div>
             </div>
           )
+        )}
+
+        {/* Multi-candidate Suggestion Pills (e.g. searching heat number 13392) */}
+        {!results.decodedDirectMatch && Object.keys(results.supplierMap || {}).length > 0 && !selectedBatchId && (
+          <div className="mb-3 bg-blue-50/50 border border-blue-200/80 p-3 rounded-xl shadow-xs animate-fadeIn">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 mb-2">
+              <Search size={14} className="text-blue-600" />
+              <span>Suggested Candidate Slabs from Supplier Reference:</span>
+              <span className="text-[10px] text-blue-600 font-normal">({Object.keys(results.supplierMap || {}).length} found)</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+              {Object.values(results.supplierMap || {}).slice(0, 12).map((item) => {
+                const inStock = currentSap.some(r => r.batch_id === item.batch_id) ||
+                                currentMother.some(r => r.batch_id === item.batch_id) ||
+                                currentCut.some(r => r.batch_id === item.batch_id);
+                return (
+                  <button
+                    key={item.batch_id}
+                    type="button"
+                    onClick={() => handleSelectBatch(item.batch_id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all shadow-xs active:scale-95 ${
+                      inStock 
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 hover:bg-emerald-200' 
+                        : 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{item.batch_id}</span>
+                    <span className="text-[10px] font-sans font-medium text-gray-500">
+                      (Slab {item.no_slab})
+                    </span>
+                    {inStock && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {/* Active Selection Chip */}
