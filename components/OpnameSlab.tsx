@@ -58,15 +58,11 @@ const OpnameSlab: React.FC<Props> = ({
         const data = await searchSlab(searchStr);
         setResults(data);
         if (data.decodedDirectMatch && !selectedBatchId) {
-          // IMPORTANT: Supplier dataset is purely an encoding reference (2024-2026).
-          // Only auto-select as Target Batch ID if it actually exists in current stock (SAP, Mother, or Cut).
-          // If not in stock, it means the slab was already used/consumed — no opname required.
-          const inStock = (data.sap && data.sap.some(r => r.batch_id === data.decodedDirectMatch!.batch_id)) ||
-                          (data.mother && data.mother.some(r => r.batch_id === data.decodedDirectMatch!.batch_id)) ||
-                          (data.cut && data.cut.some(r => r.batch_id === data.decodedDirectMatch!.batch_id));
-          if (inStock) {
-            setSelectedBatchId(data.decodedDirectMatch.batch_id);
-          }
+          // When a physical stamp is decoded (e.g. 13392-4 or 1031512 520),
+          // set the Target Batch ID to the decoded GRP Batch ID.
+          // If in stock -> Synchronize / Missing Data
+          // If not in stock -> Not Available ("goods exist in yard, but dataset is missing")
+          setSelectedBatchId(data.decodedDirectMatch.batch_id);
         }
       } else {
         setResults({ sap: [], mother: [], cut: [], opname: [], supplierMap: {}, decodedDirectMatch: null });
@@ -88,11 +84,18 @@ const OpnameSlab: React.FC<Props> = ({
   const motherExists = currentMother.some(r => r.batch_id === selectedBatchId);
   const cutExists = currentCut.some(r => r.batch_id === selectedBatchId);
 
-  // Recommendations and actions are strictly based on current stock records (SAP, Mother, Cut)
+  // Recommendations and actions:
+  // 1. Recommendations exist if any stock record matches
   const hasRecommendations = (currentSap.length > 0 || currentMother.length > 0 || currentCut.length > 0);
-  const canNotAvailable = !hasRecommendations;
+  
+  // 2. Synchronized: Batch exists in SAP AND (Mother OR Cut)
   const canSync = selectedBatchId && ((sapExists && cutExists) || (sapExists && motherExists));
+  
+  // 3. Missing Data: Batch exists in ONE stock dataset, but missing in another (stock dataset discrepancy)
   const canMissing = selectedBatchId && (sapExists || motherExists || cutExists) && !canSync;
+
+  // 4. Not Available: Physical goods exist in yard, but missing from active stock datasets (SAP, Mother, Cut)
+  const canNotAvailable = (!hasRecommendations) || Boolean(selectedBatchId && !sapExists && !motherExists && !cutExists);
 
   const currentSearchTerm = selectedBatchId || searchInput;
   const showDuplicateWarning = currentSearchTerm && currentSearchTerm.length >= 5;
@@ -122,11 +125,23 @@ const OpnameSlab: React.FC<Props> = ({
     setGangBaris('');
     setEvidenceFile(null);
     setEvidencePreview(null);
-    setManualInput({ thickness: '', width: '', length: '', grade: '', batch: '' });
+    
+    const targetBatch = selectedBatchId || searchInput;
+    const supplier = results.supplierMap?.[targetBatch.toUpperCase()] || results.decodedDirectMatch;
+
     if (type === 'Not Available') {
       setChecks({ dimension: false, grade: false });
+      // Pre-fill manual input with supplier specs if available to save operator time
+      setManualInput({
+        thickness: supplier?.thickness ? String(supplier.thickness) : '',
+        width: supplier?.width ? String(supplier.width) : '',
+        length: supplier?.length ? String(supplier.length) : '',
+        grade: supplier?.grade || '',
+        batch: targetBatch
+      });
     } else {
       setChecks({ dimension: true, grade: true });
+      setManualInput({ thickness: '', width: '', length: '', grade: '', batch: targetBatch });
     }
   };
 
@@ -357,32 +372,41 @@ const OpnameSlab: React.FC<Props> = ({
               )}
             </div>
           ) : (
-            <div className="mb-3 bg-slate-50 border border-slate-300 text-slate-800 p-3.5 rounded-xl shadow-sm animate-fadeIn">
-              <div className="flex items-start gap-2.5">
-                <span className="p-1.5 bg-slate-200 text-slate-700 rounded-lg shrink-0 mt-0.5">
-                  <Archive size={16} />
-                </span>
-                <div className="text-xs flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5 font-bold">
-                    <span className="text-slate-700">Historical Reference:</span>
-                    <span className="font-mono bg-white border border-slate-300 px-1.5 py-0.5 rounded text-slate-900">
-                      {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
-                    </span>
-                    <span className="text-slate-400">➔</span>
-                    <span className="font-mono bg-slate-700 text-white px-2 py-0.5 rounded shadow-sm">
-                      {results.decodedDirectMatch.batch_id}
-                    </span>
-                    <span className="bg-slate-200 text-slate-700 border border-slate-300 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">
-                      Already Used / Consumed
-                    </span>
+            <div className="mb-3 bg-amber-50 border border-amber-300 text-amber-950 p-3.5 rounded-xl shadow-sm animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
+                    <Search size={16} />
+                  </span>
+                  <div className="text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                      <span className="text-amber-800">Decoded Physical Stamp:</span>
+                      <span className="font-mono bg-white border border-amber-300 px-1.5 py-0.5 rounded text-amber-950">
+                        {results.decodedDirectMatch.heat_no} {results.decodedDirectMatch.no_slab} ({results.decodedDirectMatch.heat_slab_concat})
+                      </span>
+                      <span className="text-amber-400">➔</span>
+                      <span className="font-mono bg-red-600 text-white px-2 py-0.5 rounded shadow-sm">
+                        {results.decodedDirectMatch.batch_id}
+                      </span>
+                      <span className="bg-red-100 text-red-800 border border-red-200 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">
+                        Not in Stock Dataset
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-amber-900 mt-1 font-medium">
+                      Physical goods exist in yard, but missing from SAP, Mother Slab, and Cut Slab stock datasets.
+                    </div>
+                    <div className="text-[10px] text-amber-800 mt-0.5 font-medium">
+                      Supplier: <strong>{results.decodedDirectMatch.supplier_name}</strong> | Grade: {results.decodedDirectMatch.grade} | {results.decodedDirectMatch.thickness}x{results.decodedDirectMatch.width}x{results.decodedDirectMatch.length} mm ({(Number(results.decodedDirectMatch.weight_ton) || 0).toFixed(3)} MT)
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-1 font-medium leading-relaxed">
-                    This slab exists in the 2024–2026 supplier import records (<strong>{results.decodedDirectMatch.supplier_name}</strong>), but is <strong>not present in current SAP, Mother Slab, or Cut Slab stock</strong>. It has already been consumed in production — <strong className="text-slate-900">no opname is required</strong>.
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    *If you physically found this slab unexpectedly in the yard, you can record it via <strong>"Not Available in Stock"</strong>.
-                  </p>
                 </div>
+                <button
+                  onClick={() => handleAction('Not Available')}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow active:scale-95 shrink-0 flex items-center justify-center gap-1.5 self-stretch sm:self-auto"
+                >
+                  <X size={15} strokeWidth={2.5} />
+                  <span>Record as Not Available</span>
+                </button>
               </div>
             </div>
           )
