@@ -22,6 +22,7 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
   const [deleteAllInput, setDeleteAllInput] = useState('');
   const [deletingAll, setDeletingAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const { t } = useI18n();
@@ -141,14 +142,17 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
         await fetchBackups();
         setShowLoadModal(true);
     } else if (action === 'download') {
-        const jsonContent = JSON.stringify(records, null, 2);
+        const dataToSave = records.length > 0 ? records : await fetchAllOpnameRecords(true);
+        const jsonContent = JSON.stringify(dataToSave, null, 2);
         const blob = new Blob([jsonContent], { type: 'application/json' });
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `opname_backup_${new Date().toISOString()}.json`;
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `opname_backup_${new Date().toISOString().split('T')[0]}_${dataToSave.length}_records.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
     } else if (action === 'upload') {
         fileInputRef.current?.click();
     }
@@ -237,9 +241,36 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
     }
   };
 
-  const exportCSV = () => {
-    if (records.length === 0) return;
-    const headers = [
+  const escapeCsvCell = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    const str = String(val);
+    if (/[",\n\r]/.test(str)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const exportCSV = async (mode: 'all' | 'filtered' = 'all') => {
+    setIsExporting(true);
+    try {
+      let exportData = records;
+      // If records cache is not yet populated or empty, fetch fresh from DB
+      if (!exportData || exportData.length === 0) {
+        exportData = await fetchAllOpnameRecords(true);
+      }
+
+      const hasActiveFilters = Object.values(filters).some(Boolean);
+      let targetRecords = exportData;
+      if (mode === 'filtered' && hasActiveFilters) {
+        targetRecords = filteredRecords;
+      }
+
+      if (!targetRecords || targetRecords.length === 0) {
+        alert("No opname records found to export.");
+        return;
+      }
+
+      const headers = [
         'Date', 'User', 'Time', 'Batch ID',
         'Grade SAP', 'Grade Mother', 'Grade Cut',
         'Database Thick', 'Database Width', 'Database Length',
@@ -247,34 +278,55 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
         'Dimensi Match dengan Data', 'Actual Thick', 'Actual Width', 'Actual Length',
         'Grade Match dengan Data', 'Actual Grade', 'Remarks',
         'Evidence'
-    ];
+      ];
 
-    const rows = records.map(r => {
+      const rows = targetRecords.map(r => {
         const dimMatch = (!r.database_t && !r.database_w && !r.database_l) ? 'NO REFERENCE' : (r.dimension_match ? 'YES' : 'NO');
         const gradeMatch = (!r.grade_sap && !r.grade_mother && !r.grade_cut) ? 'NO REFERENCE' : (r.grade_match ? 'YES' : 'NO');
 
         return [
-            r.date, r.user_name, r.time, r.batch_id,
-            r.grade_sap || '-', r.grade_mother || '-', r.grade_cut || '-',
-            r.database_t || '-', r.database_w || '-', r.database_l || '-',
-            r.location, r.gang_baris || '-', r.status,
-            dimMatch,
-            r.actual_thick || '-', r.actual_width || '-', r.actual_length || '-',
-            gradeMatch,
-            r.actual_grade || '-',
-            (r.remarks || '').replace(/,/g, ' '),
-            r.image_url || '-'
-        ];
-    });
+          escapeCsvCell(r.date),
+          escapeCsvCell(r.user_name),
+          escapeCsvCell(r.time),
+          escapeCsvCell(r.batch_id),
+          escapeCsvCell(r.grade_sap || '-'),
+          escapeCsvCell(r.grade_mother || '-'),
+          escapeCsvCell(r.grade_cut || '-'),
+          escapeCsvCell(r.database_t || '-'),
+          escapeCsvCell(r.database_w || '-'),
+          escapeCsvCell(r.database_l || '-'),
+          escapeCsvCell(r.location),
+          escapeCsvCell(r.gang_baris || '-'),
+          escapeCsvCell(r.status),
+          escapeCsvCell(dimMatch),
+          escapeCsvCell(r.actual_thick || '-'),
+          escapeCsvCell(r.actual_width || '-'),
+          escapeCsvCell(r.actual_length || '-'),
+          escapeCsvCell(gradeMatch),
+          escapeCsvCell(r.actual_grade || '-'),
+          escapeCsvCell(r.remarks || ''),
+          escapeCsvCell(r.image_url || '-')
+        ].join(',');
+      });
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `opname_list_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // UTF-8 BOM for Microsoft Excel auto-detection without garbling
+      const bom = '\uFEFF';
+      const csvContent = bom + [headers.map(escapeCsvCell).join(','), ...rows].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `opname_list_${new Date().toISOString().split('T')[0]}_${targetRecords.length}_records.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err: any) {
+      console.error("CSV Export failed:", err);
+      alert("Error exporting CSV: " + (err.message || 'Unknown error'));
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const uniqueInspectors = Array.from(new Set(records.map(r => r.user_name))).sort();
@@ -433,12 +485,31 @@ const OpnameList: React.FC<Props> = ({ role, userName, isLocked = false }) => {
               </button>
             )}
 
-            <button
-              onClick={exportCSV}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-bold flex items-center gap-1.5 sm:gap-2 transition-all shadow-md active:scale-95 text-xs"
-            >
-              <FileSpreadsheet size={15} /> <span className="hidden sm:inline">{t.opnameList.exportCsv}</span><span className="sm:hidden">CSV</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => exportCSV('all')}
+                disabled={isExporting}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-bold flex items-center gap-1.5 sm:gap-2 transition-all shadow-md active:scale-95 text-xs"
+                title={`Download all opnamed data (${records.length} records)`}
+              >
+                <FileSpreadsheet size={15} />
+                <span className="hidden sm:inline">
+                  {isExporting ? 'Exporting...' : `${t.opnameList.exportCsv} (${records.length})`}
+                </span>
+                <span className="sm:hidden">{isExporting ? '...' : `CSV (${records.length})`}</span>
+              </button>
+
+              {Object.values(filters).some(Boolean) && (
+                <button
+                  onClick={() => exportCSV('filtered')}
+                  disabled={isExporting}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold flex items-center gap-1 transition-all text-xs shadow-sm"
+                  title={`Export filtered records (${filteredRecords.length})`}
+                >
+                  <span>Filtered ({filteredRecords.length})</span>
+                </button>
+              )}
+            </div>
         </div>
       </div>
 
